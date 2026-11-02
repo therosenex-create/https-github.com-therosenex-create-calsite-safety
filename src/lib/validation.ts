@@ -251,6 +251,48 @@ export const licenseCheckSchema = z.object({
     "CANCELED",
   ]),
   note: text(20, 2000),
+  documentId: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => value || null),
+});
+
+export const reviewSchema = z.object({
+  requirementId: z.string().trim().min(1, "too_small"),
+  decision: z.enum(["STILL_PENDING", "SOURCE_READ_WITH_LIMITATIONS", "NEEDS_ANOTHER_PASS"]),
+  note: text(40, 4000),
+  acknowledgedNotCertification: z.string().refine((value) => value === "yes", "acknowledge_required"),
+});
+
+const optionalUrl = z
+  .string()
+  .trim()
+  .max(500, "too_big")
+  .optional()
+  .or(z.literal(""))
+  .transform((value) => value || null)
+  .refine((value) => value === null || /^https?:\/\//i.test(value), "invalid");
+
+export const permitSchema = z.object({
+  projectId: z.string().trim().min(1, "too_small"),
+  authorityName: text(2, 160),
+  jurisdictionLabel: text(2, 160),
+  permitType: text(2, 120),
+  permitNumber: optionalText(80),
+  status: z.enum(["NOT_STARTED", "DRAFT", "SUBMITTED", "CORRECTIONS", "USER_REPORTED_APPROVAL", "CLOSED", "UNKNOWN"]),
+  appliedOn: dateOnly,
+  notes: optionalText(4000),
+  officialUrl: optionalUrl,
+});
+
+export const citySourceSchema = z.object({
+  cityName: text(2, 80),
+  countyName: text(2, 80),
+  subject: text(2, 160),
+  officialUrl: optionalUrl,
+  notes: text(20, 4000),
 });
 
 export const inviteSchema = z.object({

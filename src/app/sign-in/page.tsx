@@ -7,15 +7,17 @@ import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/session";
 import { signInAction } from "@/server/actions";
 
-export default async function SignInPage() {
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ revoked?: string }> }) {
+  const params = await searchParams;
   const session = await auth();
-  if (session?.user) redirect("/app");
+  if (session?.user && params.revoked !== "1") redirect("/app");
   const locale = await getLocale();
   return (
     <>
       <PublicHeader locale={locale} />
       <main className="mx-auto max-w-md px-4 py-10">
         <h1 className="font-serif text-3xl text-navy">{t(locale, "nav.signIn")}</h1>
+        {params.revoked === "1" ? <p className="note mt-4">{t(locale, "security.revoked")}</p> : null}
         {process.env.DEMO_LOGIN_HINT === "true" ? <p className="note mt-4">{t(locale, "common.demoHint")}</p> : null}
         <div className="card mt-6">
           <ActionForm action={signInAction} submitLabel={t(locale, "nav.signIn")}>

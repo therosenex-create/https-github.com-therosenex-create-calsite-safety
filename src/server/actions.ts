@@ -11,9 +11,11 @@ import { getActor, getLocale } from "@/lib/session";
 import {
   adminSetPassword,
   changePassword,
+  enforceLoginRateLimit,
   inviteMember,
   recordLicenseCheck,
   registerCompany,
+  revokeSessions,
   updateMemberRole,
   updateOrganization,
 } from "@/lib/services/accounts";
@@ -48,6 +50,7 @@ import {
   updateTraining,
 } from "@/lib/services/work";
 import { assignRequirement, flagSourceForManualReview, linkEvidence, updateIipp } from "@/lib/services/regulatory";
+import { createCitySource, createPermit, recordQualifiedReview } from "@/lib/services/records";
 import { prisma } from "@/lib/db";
 import type { ActionState } from "@/components/action-form";
 
@@ -96,6 +99,12 @@ export async function switchOrgAction(formData: FormData) {
 
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const locale = await getLocale();
+  const email = String(formData.get("email") ?? "");
+  try {
+    await enforceLoginRateLimit(email);
+  } catch (error) {
+    return fail(error);
+  }
   try {
     await signIn("credentials", {
       email: String(formData.get("email") ?? ""),
@@ -485,11 +494,12 @@ export async function updateOrgAction(_prev: ActionState, formData: FormData): P
 
 export async function licenseCheckAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    await recordLicenseCheck(await getActor(), values(formData, ["kind", "status", "note"]));
+    await recordLicenseCheck(await getActor(), values(formData, ["kind", "status", "note", "documentId"]));
   } catch (error) {
     return fail(error);
   }
   revalidatePath("/app/settings");
+  revalidatePath("/app/licensing");
   return {};
 }
 
@@ -520,6 +530,47 @@ export async function passwordAction(_prev: ActionState, formData: FormData): Pr
   } catch (error) {
     return fail(error);
   }
+  redirect("/sign-in?revoked=1");
+}
+
+export async function revokeSelfAction() {
+  const actor = await getActor();
+  await revokeSessions(actor, actor.userId);
+  redirect("/sign-in?revoked=1");
+}
+
+export async function revokeMemberAction(userId: string) {
+  await revokeSessions(await getActor(), userId);
+  revalidatePath("/app/settings");
+}
+
+export async function reviewAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await recordQualifiedReview(await getActor(), values(formData, ["requirementId", "decision", "note", "acknowledgedNotCertification"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/regulatory/reviews");
+  return {};
+}
+
+export async function permitAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await createPermit(await getActor(), values(formData, ["projectId", "authorityName", "jurisdictionLabel", "permitType", "permitNumber", "status", "appliedOn", "notes", "officialUrl"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/permits");
+  return {};
+}
+
+export async function citySourceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await createCitySource(await getActor(), values(formData, ["cityName", "countyName", "subject", "officialUrl", "notes"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/jurisdictions");
   return {};
 }
 

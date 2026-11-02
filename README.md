@@ -41,10 +41,19 @@ Auth.js is self-hosted. There is no Clerk account and no OAuth provider in this 
 - Agency filings, certified payroll, prevailing-wage calculations, or e-signatures that claim to be sworn
 - A numeric compliance score
 - City, county, fire-district, or school-district ordinances
-- Most of Title 8, including wildfire smoke, lead, asbestos, §1541.1, and §1730 text
+- Most of Title 8. Partial summaries now include §1730, §1541.1, §5141.1, and §1532.1. Asbestos, §1731, §1724, and §5144 are still unread
 - Automated regulatory crawling. Change detection compares catalog text only when called in code and is not scheduled
 - Email delivery, billing, and object storage for files larger than 4 MB
-- Playwright browser tests. Critical paths are covered in Vitest against Postgres
+- A distributed login rate limiter. Failed sign-ins are counted in Postgres for 15 minutes
+- Playwright in CI. Critical paths are covered in Vitest against Postgres
+
+## Phase 2 additions
+
+- Company qualified-review notes for the partially read Title 8 entries. The note does not edit the catalog and is not a certification.
+- Manual CSLB and DIR checks can attach a company file. The timestamp is the server clock. No status means CalSite verified the number.
+- Permit records and city-source notes start empty. A city name does not load an ordinance.
+- Password changes and "End sessions" increment a session version so older JWTs stop at the next request.
+- A content-security policy sets `frame-ancestors 'none'` and `object-src 'none'`. Scripts still allow `'unsafe-inline'` because this release has no nonce.
 
 The in-app Guidance page and the regulatory catalog list these gaps in the product, not only here.
 

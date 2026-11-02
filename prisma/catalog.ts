@@ -90,10 +90,52 @@ export const sources: Source[] = [
     subject: "Roofing fall protection cross-reference",
     officialUrl: "https://www.dir.ca.gov/title8/1730.html",
     reliability: "PRIMARY_STATUTE_OR_REGULATION",
-    reviewStatus: "UNREVIEWED",
-    isBinding: false,
-    limitations: "The URL responded on 2026-11-02. The section text was not reviewed. Section 1670 points readers here for roofing. No duty from §1730 is stated in this catalog.",
-    retrievalStatus: "URL_REACHABLE",
+    reviewStatus: "PENDING_QUALIFIED_REVIEW",
+    isBinding: true,
+    limitations: DIR_LIMIT + " Section 1731 (residential-type roofing), section 1510, and section 1724 were not extracted. The 20-foot sentences are not the §1670 7 1/2 foot rule and do not apply to every roof.",
+    retrievalStatus: "FETCHED_PARTIAL",
+  },
+  {
+    code: "T8-1541-1",
+    agencyCode: "DOSH",
+    jurisdictionCode: "CA",
+    title: "8 CCR §1541.1 Requirements for protective systems",
+    documentKind: "REGULATION",
+    subject: "Excavation protective systems",
+    officialUrl: "https://www.dir.ca.gov/title8/1541_1.html",
+    reliability: "PRIMARY_STATUTE_OR_REGULATION",
+    reviewStatus: "PENDING_QUALIFIED_REVIEW",
+    isBinding: true,
+    limitations: DIR_LIMIT + " Appendices and later design options were not fully extracted. The 5-foot and 1.5:1 figures are not the only rule in the section.",
+    retrievalStatus: "FETCHED_PARTIAL",
+  },
+  {
+    code: "T8-5141-1",
+    agencyCode: "DOSH",
+    jurisdictionCode: "CA",
+    title: "8 CCR §5141.1 Protection from wildfire smoke",
+    documentKind: "REGULATION",
+    subject: "Wildfire smoke",
+    officialUrl: "https://www.dir.ca.gov/title8/5141_1.html",
+    reliability: "PRIMARY_STATUTE_OR_REGULATION",
+    reviewStatus: "PENDING_QUALIFIED_REVIEW",
+    isBinding: true,
+    limitations: DIR_LIMIT + " Appendix B and section 5144 were not extracted. This app does not read the Air Quality Index.",
+    retrievalStatus: "FETCHED_PARTIAL",
+  },
+  {
+    code: "T8-1532-1",
+    agencyCode: "DOSH",
+    jurisdictionCode: "CA",
+    title: "8 CCR §1532.1 Lead",
+    documentKind: "REGULATION",
+    subject: "Construction lead",
+    officialUrl: "https://www.dir.ca.gov/title8/1532_1.html",
+    reliability: "PRIMARY_STATUTE_OR_REGULATION",
+    reviewStatus: "PENDING_QUALIFIED_REVIEW",
+    isBinding: true,
+    limitations: DIR_LIMIT + " Trigger tasks, medical surveillance, and most of the section were not extracted. Do not treat a missing hazard entry as proof that a material is lead-free.",
+    retrievalStatus: "FETCHED_PARTIAL",
   },
   {
     code: "LEGINFO",
@@ -617,6 +659,120 @@ export const requirements: CatalogRequirement[] = [
     evidence: [{ name: "Manual registration check", description: "A dated note of what a person saw on the official page. It is not an agency confirmation inside this app.", statedInSource: false }],
     rules: [{ description: "If the project owner might be a public agency or school, mark the project question pending qualified review. Do not mark the contractor eligible from a number alone.", result: "PENDING_QUALIFIED_REVIEW" }],
   },
+  {
+    ...base,
+    code: "CCR-T8-1730",
+    sourceCode: "T8-1730",
+    title: "Roof hazards during roofing operations",
+    citation: "8 CCR §1730",
+    plainLanguageEn:
+      "The DIR convenience copy of section 1730 says that during roofing operations the employer shall comply with section 1509 and employees shall be trained and instructed under section 1510. It says this section does not apply to residential-type roofing activities as defined in section 1731. For the single-unit and multiple-unit slopes that were read, the copy repeatedly says employees shall be protected from falls from roofs of a height of more than 20 feet, and subsection (g) says that height is the vertical distance from the walking/working surface to the level below, not counting parapet height. Felt-laying machines pulled by an operator who walks backwards are called out separately, including a provision that applies regardless of height on low slopes. This is not the 7 1/2 foot trigger in section 1670. Sections 1731, 1510, and 1724 were not extracted.",
+    plainLanguageEs:
+      "La copia de conveniencia del DIR de la sección 1730 dice que durante operaciones de techado el empleador debe cumplir la sección 1509 y que los empleados deben capacitarse según la sección 1510. Dice que esta sección no aplica a actividades de techado de tipo residencial definidas en la sección 1731. Para las pendientes de cubierta de una unidad y de varias unidades que se leyeron, la copia dice repetidamente que los empleados deben protegerse de caídas desde techos de más de 20 pies de altura, y el inciso (g) dice que esa altura es la distancia vertical desde la superficie de tránsito hasta el nivel de abajo, sin contar la altura del parapeto. Las máquinas de fieltro arrastradas por un operador que camina hacia atrás se tratan aparte, incluida una disposición que aplica sin importar la altura en pendientes bajas. Esto no es el detonante de 7 1/2 pies de la sección 1670. No se extrajeron las secciones 1731, 1510 ni 1724.",
+    officialExcerpt:
+      "Employees shall be protected from falls from roofs of a height of more than 20 feet by use of one or a combination of the methods in this section.",
+    scope: "Roofing operations under section 1730, excluding residential-type roofing as defined in section 1731, which was not read.",
+    industry: "Roofing covered by this construction section. Not every elevated task.",
+    activity: "Fall protection on roofs, by slope and roof covering, using the methods named in the section.",
+    responsibleParty: "Employer",
+    deadlineOrTrigger:
+      "The retrieved copy uses a height of more than 20 feet in the slope subsections that were read, measured under subsection (g). On slopes 0:12 to 4:12, equipment pulled by an operator who walks backwards makes that low-slope provision apply regardless of height. Do not use 20 feet as the rule for residential-type roofing under section 1731 or for section 1670.",
+    deadlineVerified: false,
+    recurrence: null,
+    reviewStatus: "PENDING_QUALIFIED_REVIEW",
+    limitations: DIR_LIMIT + " Not the §1670 7 1/2 foot rule. Section 1731 was not fetched. Warning-line details and cross-references to §1724 were not fully copied.",
+    legalAuthority: "California Code of Regulations, Title 8, section 1730",
+    triggers: [{ description: "Roof height of more than 20 feet in the slope subsections that were read, with a separate regardless-of-height provision for certain backward-walking equipment on low slopes.", statedInSource: true }],
+    exceptions: [{ description: "The retrieved subsection (a) says the section does not apply to residential-type roofing activities as defined in section 1731. Section 1731 was not reviewed.", partial: true }],
+    evidence: [{ name: "Roof work plan", description: "The section names methods. It does not prescribe a CalSite form. A company note is not a qualified-person certification.", statedInSource: false }],
+    rules: [{ description: "Potentially applicable to non-residential roofing operations. Confirm the slope, covering, and whether section 1731 applies before using any height figure.", result: "POTENTIALLY_APPLICABLE" }],
+  },
+  {
+    ...base,
+    code: "CCR-T8-1541-1",
+    sourceCode: "T8-1541-1",
+    title: "Excavation protective systems",
+    citation: "8 CCR §1541.1",
+    plainLanguageEn:
+      "The retrieved copy says each employee in an excavation shall be protected from cave-ins by an adequate protective system designed under subsection (b) or (c), except when the excavation is made entirely in stable rock, or is less than 5 feet deep and a competent person examines the ground and finds no indication of a potential cave-in. Option 1 says excavations shall be sloped at an angle not steeper than one and one-half horizontal to one vertical (34 degrees), unless the employer uses another listed option, and those slopes follow the Type C configurations in Appendix B. Other options, including appendices and tabulated data, were not fully extracted. The 5-foot and 1.5:1 figures are not the only rule.",
+    plainLanguageEs:
+      "La copia recuperada dice que cada empleado en una excavación debe protegerse de derrumbes con un sistema de protección adecuado diseñado según el inciso (b) o (c), excepto cuando la excavación está hecha por completo en roca estable, o tiene menos de 5 pies de profundidad y una persona competente examina el terreno y no encuentra indicios de un posible derrumbe. La opción 1 dice que las excavaciones deben tener un talud no más empinado que uno y medio horizontal por uno vertical (34 grados), salvo que el empleador use otra opción listada, y esos taludes siguen las configuraciones de suelo tipo C del Apéndice B. No se extrajeron por completo otras opciones, incluidos los apéndices y los datos tabulados. Las cifras de 5 pies y 1.5:1 no son la única regla.",
+    officialExcerpt:
+      "Each employee in an excavation shall be protected from cave-ins by an adequate protective system designed in accordance with Section 1541.1(b) or (c) except when: (A) Excavations are made entirely in stable rock; or (B) Excavations are less than 5 feet in depth and examination of the ground by a competent person provides no indication of a potential cave-in.",
+    scope: "Employees in excavations under section 1541.1. This does not replace section 1541 utility-location duties.",
+    industry: "Excavation covered by the Construction Safety Orders.",
+    activity: "Cave-in protection, sloping, benching, and other protective-system design options.",
+    responsibleParty: "Employer. The retrieved text also assigns slope selection to the employer or the employer's designee, and a competent-person examination appears in the under-5-foot exception.",
+    deadlineOrTrigger: "Before employees are in the excavation, for the protection duty in the excerpt. No calendar deadline was extracted. Do not treat 5 feet or 34 degrees as sufficient for every soil and every option.",
+    deadlineVerified: false,
+    recurrence: null,
+    reviewStatus: "PENDING_QUALIFIED_REVIEW",
+    limitations: DIR_LIMIT + " Appendices A and B and later design options were not fully copied. The 5-foot and 1.5:1 figures are not the only rule. A locate request under section 1541 does not satisfy this section.",
+    legalAuthority: "California Code of Regulations, Title 8, section 1541.1",
+    triggers: [{ description: "Employees in an excavation, unless one of the two exceptions in subsection (a)(1) is met.", statedInSource: true }],
+    exceptions: [{ description: "Stable rock, or less than 5 feet with a competent-person examination that finds no indication of a potential cave-in. Other exceptions were not fully copied.", partial: true }],
+    evidence: [{ name: "Protective-system selection", description: "Option 1 points to Appendix B. A company note of the option used is not an engineering certification.", statedInSource: false }],
+    rules: [{ description: "Potentially applicable to excavation work. The protective-system choice depends on depth, soil, and which option the employer actually uses.", result: "POTENTIALLY_APPLICABLE" }],
+  },
+  {
+    ...base,
+    code: "CCR-T8-5141-1",
+    sourceCode: "T8-5141-1",
+    title: "Protection from wildfire smoke",
+    citation: "8 CCR §5141.1",
+    plainLanguageEn:
+      "The retrieved copy says section 5141.1 applies where the current Air Quality Index for PM2.5 is 151 or greater, regardless of the AQI for other pollutants, and the employer should reasonably anticipate that employees may be exposed to wildfire smoke. The copy lists exemptions for certain filtered buildings and vehicles, a worksite measurement showing the concentration does not exceed a current AQI of 151, exposure totaling one hour or less in a shift, and firefighters engaged in wildland firefighting. It also says the employer shall determine exposure at the start of each shift by checking specified AQI sources or by measuring, shall communicate hazards in a readily understandable language, and shall use engineering controls to reduce exposure below a current AQI of 151 when feasible. A retrieved sentence says respirator use is required where the current AQI for PM2.5 exceeds 500. This app does not check the AQI. Appendix B and section 5144 were not extracted.",
+    plainLanguageEs:
+      "La copia recuperada dice que la sección 5141.1 aplica cuando el índice de calidad del aire actual para PM2.5 es 151 o mayor, sin importar el AQI de otros contaminantes, y el empleador debería prever razonablemente que los empleados pueden estar expuestos al humo de incendios forestales. La copia enumera exenciones para ciertos edificios y vehículos con aire filtrado, una medición en el sitio que muestre que la concentración no supera un AQI actual de 151, una exposición total de una hora o menos en un turno, y bomberos en combate de incendios forestales. También dice que el empleador debe determinar la exposición al inicio de cada turno consultando fuentes de AQI especificadas o midiendo, comunicar los peligros en un idioma comprensible, y usar controles de ingeniería para reducir la exposición por debajo de un AQI actual de 151 cuando sea factible. Una oración recuperada dice que el uso de respirador es obligatorio cuando el AQI actual para PM2.5 supera 500. Esta aplicación no consulta el AQI. No se extrajeron el Apéndice B ni la sección 5144.",
+    officialExcerpt:
+      "This section applies to workplaces where: (A) The current Air Quality Index (current AQI) for PM2.5 is 151 or greater, regardless of the AQI for other pollutants; and (B) The employer should reasonably anticipate that employees may be exposed to wildfire smoke.",
+    scope: "Workplaces meeting both scope conditions, subject to the exemptions in subsection (a)(2).",
+    industry: "Not limited to construction on the face of the scope. Construction outdoors can fall inside it when the conditions are met.",
+    activity: "Identifying PM2.5 exposure from wildfire smoke and applying the controls in the section.",
+    responsibleParty: "Employer",
+    deadlineOrTrigger:
+      "Current AQI for PM2.5 of 151 or greater, plus a reasonable anticipation of wildfire-smoke exposure, for the scope. Exposure determination at the start of each shift for covered worksites. Respirator use where the current AQI for PM2.5 exceeds 500, in the sentence that was read. This app does not calculate or retrieve the AQI.",
+    deadlineVerified: true,
+    recurrence: null,
+    reviewStatus: "PENDING_QUALIFIED_REVIEW",
+    limitations: DIR_LIMIT + " A forecast or an AQI website is not a measurement this app performs. Section 5144 and Appendix B were not extracted.",
+    legalAuthority: "California Code of Regulations, Title 8, section 5141.1",
+    triggers: [
+      { description: "Current AQI for PM2.5 is 151 or greater and the employer should reasonably anticipate wildfire-smoke exposure.", statedInSource: true },
+      { description: "Where the current AQI for PM2.5 exceeds 500, the retrieved copy says respirator use is required.", statedInSource: true },
+    ],
+    exceptions: [{ description: "Filtered enclosed buildings and vehicles, a compliant worksite measurement, exposure of one hour or less in a shift, and wildland firefighters, as listed in the retrieved subsection (a)(2).", partial: true }],
+    evidence: [{ name: "AQI check record", description: "The section describes how the employer determines exposure. A note in this app is the company's record, not an air-quality measurement.", statedInSource: false }],
+    rules: [{ description: "Potentially applicable when outdoor work may meet the AQI and wildfire-smoke conditions. Those facts are not known until someone checks a source the section names.", result: "POTENTIALLY_APPLICABLE" }],
+  },
+  {
+    ...base,
+    code: "CCR-T8-1532-1",
+    sourceCode: "T8-1532-1",
+    title: "Lead in construction",
+    citation: "8 CCR §1532.1",
+    plainLanguageEn:
+      "The retrieved copy says section 1532.1 applies to all construction work where an employee may be occupationally exposed to lead, including work excluded from the general-industry lead standard by section 5198(a)(2). The definitions that were read set an action level of 2 micrograms per cubic meter as an 8-hour time-weighted average, without regard to respirator use. Subsection (c) that was read says the employer shall ensure that no employee is exposed to an airborne concentration of lead greater than 10 micrograms per cubic meter as an 8-hour TWA, and it includes an abrasive-blasting exception until January 1, 2030 at 25 micrograms per cubic meter that was not copied in full. Trigger tasks, medical surveillance, and most of the section were not extracted. Do not treat a blank hazard entry as proof that a material is lead-free.",
+    plainLanguageEs:
+      "La copia recuperada dice que la sección 1532.1 aplica a todo trabajo de construcción en el que un empleado pueda estar expuesto ocupacionalmente al plomo, incluido el trabajo excluido de la norma general de plomo por la sección 5198(a)(2). Las definiciones leídas fijan un nivel de acción de 2 microgramos por metro cúbico como promedio ponderado de 8 horas, sin considerar el uso de respirador. El inciso (c) leído dice que el empleador debe asegurar que ningún empleado esté expuesto a una concentración de plomo en el aire mayor de 10 microgramos por metro cúbico como TWA de 8 horas, e incluye una excepción de chorro abrasivo hasta el 1 de enero de 2030 a 25 microgramos por metro cúbico que no se copió completa. No se extrajeron las tareas detonantes, la vigilancia médica ni la mayor parte de la sección. No trate un campo de peligro vacío como prueba de que un material no tiene plomo.",
+    officialExcerpt:
+      "This section applies to all construction work where an employee may be occupationally exposed to lead.",
+    scope: "Construction work with possible occupational lead exposure, as stated in the scope sentence. Section 5198 was not extracted.",
+    industry: "Construction, as defined in the retrieved scope, including the examples listed there. The example list was not fully copied.",
+    activity: "Work that may expose employees to lead, including demolition, removal, renovation, installation, cleanup, and related maintenance named in the scope.",
+    responsibleParty: "Employer",
+    deadlineOrTrigger:
+      "The retrieved subsection (c) states a 10 microgram per cubic meter 8-hour TWA figure. The action-level definition that was read states 2 micrograms per cubic meter. An abrasive-blasting exception until January 1, 2030 was seen and not copied in full. Do not calculate a medical or task deadline from this summary.",
+    deadlineVerified: false,
+    recurrence: null,
+    reviewStatus: "PENDING_QUALIFIED_REVIEW",
+    limitations: DIR_LIMIT + " The PEL and action-level sentences were read. The abrasive-blasting exception, trigger tasks, and medical surveillance were not fully extracted. Older templates that use different numbers were not compared.",
+    legalAuthority: "California Code of Regulations, Title 8, section 1532.1",
+    triggers: [{ description: "Construction work where an employee may be occupationally exposed to lead.", statedInSource: true }],
+    exceptions: [{ description: "The retrieved PEL subsection includes an abrasive-blasting exception until January 1, 2030. The full exception text was not copied.", partial: true }],
+    evidence: [{ name: "Exposure assessment", description: "Expected somewhere in the standard. The controlling assessment subsections were not fully extracted, so this catalog does not state the exact record.", statedInSource: false }],
+    rules: [{ description: "Potentially applicable to construction that may disturb lead-containing material. Applicability is pending until the material and task are known.", result: "PENDING_QUALIFIED_REVIEW" }],
+  },
 ];
 
 export function catalogProblems(): string[] {
@@ -637,6 +793,17 @@ export function catalogProblems(): string[] {
   const fall = requirements.find((requirement) => requirement.code === "CCR-T8-1670");
   if (!fall?.limitations.toLowerCase().includes("not a universal")) {
     problems.push("1670 must say it is not a universal height");
+  }
+  const roof = requirements.find((requirement) => requirement.code === "CCR-T8-1730");
+  if (!roof?.plainLanguageEn.includes("1731") || !roof.plainLanguageEn.includes("not the 7 1/2 foot")) {
+    problems.push("1730 must keep the residential gap and distinguish section 1670");
+  }
+  const excavation = requirements.find((requirement) => requirement.code === "CCR-T8-1541-1");
+  if (!excavation?.limitations.toLowerCase().includes("not the only rule")) {
+    problems.push("1541.1 must say the depth and slope figures are not the only rule");
+  }
+  for (const code of ["CCR-T8-5141-1", "CCR-T8-1532-1", "CCR-T8-1730", "CCR-T8-1541-1"]) {
+    if (!requirements.some((requirement) => requirement.code === code)) problems.push(`${code} missing`);
   }
   return problems;
 }
