@@ -37,6 +37,7 @@ import {
   createInspection,
   createMeeting,
   createProject,
+  createTailgate,
   createTraining,
   removeCrew,
   saveChecklist,
@@ -50,7 +51,16 @@ import {
   updateProject,
   updateTraining,
 } from "@/lib/services/work";
-import { assignRequirement, flagSourceForManualReview, linkEvidence, updateIipp } from "@/lib/services/regulatory";
+import {
+  assignRequirement,
+  createIippSubmittal,
+  flagSourceForManualReview,
+  linkEvidence,
+  markIippVerified,
+  publishIippRevision,
+  setIippSubmittalStatus,
+  updateIipp,
+} from "@/lib/services/regulatory";
 import { getMailer } from "@/lib/mailer";
 import { acceptContractDraft, createContractDocument, createContractDraft, recordAddendumReview, updateContractTask } from "@/lib/services/contracts";
 import { createLocalRule, saveCloseoutItem } from "@/lib/services/local";
@@ -225,6 +235,23 @@ const meetingKeys = [
   "projectId", "title", "topic", "language", "scheduledAt", "leaderName", "policyBasis", "requirementCode",
   "discussionPoints", "workerQuestions", "followUp", "notes", "status",
 ];
+
+const tailgateKeys = ["projectId", "topicCode", "conductedOn", "conductorName", "signatureName", "roster", "language"];
+
+export async function createTailgateAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  let projectId = "";
+  try {
+    const meeting = await createTailgate(await getActor(), values(formData, tailgateKeys));
+    projectId = meeting.projectId ?? "";
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/tailgates");
+  revalidatePath("/app/meetings");
+  revalidatePath("/app/projects");
+  revalidatePath("/app");
+  redirect(projectId ? `/app/tailgates?project=${projectId}` : "/app/tailgates");
+}
 
 export async function createMeetingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   let id = "";
@@ -451,12 +478,67 @@ export async function updateIippAction(_prev: ActionState, formData: FormData): 
         procedures[element] = { ...procedures[element], responsible: String(value) };
       }
     }
-    await updateIipp(await getActor(), { procedures, claim: String(formData.get("implementationClaim") ?? "") });
+    await updateIipp(await getActor(), {
+      procedures,
+      claim: String(formData.get("implementationClaim") ?? ""),
+      header: values(formData, ["title", "revisionLabel", "administratorName", "administratorTitle", "annualReviewOn"]),
+    });
   } catch (error) {
     return fail(error);
   }
   revalidatePath("/app/iipp");
+  revalidatePath("/app");
   return {};
+}
+
+export async function publishIippAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  void formData;
+  try {
+    await publishIippRevision(await getActor());
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/iipp");
+  revalidatePath("/app");
+  const locale = await getLocale();
+  return { notice: t(locale, "iipp.activeNotice") };
+}
+
+export async function verifyIippAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  void formData;
+  try {
+    await markIippVerified(await getActor());
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/iipp");
+  revalidatePath("/app");
+  const locale = await getLocale();
+  return { notice: t(locale, "iipp.verifiedNotice") };
+}
+
+export async function createIippSubmittalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  let projectId = "";
+  try {
+    const submittal = await createIippSubmittal(await getActor(), values(formData, ["projectId", "companyName", "note"]));
+    projectId = submittal.projectId;
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/iipp");
+  redirect(projectId ? `/app/iipp?project=${projectId}` : "/app/iipp");
+}
+
+export async function setIippSubmittalStatusAction(id: string, formData: FormData) {
+  const projectId = String(formData.get("projectId") ?? "");
+  try {
+    const status = formData.get("status") === "APPROVED" ? "APPROVED" : "PENDING_REVIEW";
+    await setIippSubmittalStatus(await getActor(), id, status);
+  } catch (error) {
+    logServerEvent("action_failed", { name: error instanceof Error ? error.name : "unknown" });
+  }
+  revalidatePath("/app/iipp");
+  redirect(projectId ? `/app/iipp?project=${encodeURIComponent(projectId)}` : "/app/iipp");
 }
 
 export async function assignRequirementAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

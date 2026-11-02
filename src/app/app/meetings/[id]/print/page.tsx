@@ -31,6 +31,9 @@ export default async function MeetingPrint({ params }: { params: Promise<{ id: s
         {meeting.attendance.map((row) => (
           <li key={row.id}>{row.employee.firstName} {row.employee.lastName} · {row.method}</li>
         ))}
+        {meeting.acknowledgments.map((row) => (
+          <li key={row.id}>{row.signerName} · {t(locale, `tailgate.role.${row.roleLabel}`)} · {formatPacific(locale, row.signedAt)} · {row.method}</li>
+        ))}
       </ul>
       <PrintFooter locale={locale} demonstration={actor.isDemonstration} />
     </article>

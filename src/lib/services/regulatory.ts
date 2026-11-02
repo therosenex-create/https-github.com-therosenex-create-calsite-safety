@@ -3,8 +3,9 @@ import type { Actor } from "../actor";
 import { assertCan } from "../authz";
 import { prisma } from "../db";
 import { AppError } from "../errors";
-import { applicabilitySchema, catalogSearchSchema, evidenceLinkSchema, parseInput } from "../validation";
-import { audit } from "./common";
+import { programShape, revisionShape, samePlan, snapshotElements } from "../iipp-plan";
+import { iippHeaderSchema, iippSubmittalSchema, parseInput, applicabilitySchema, catalogSearchSchema, evidenceLinkSchema } from "../validation";
+import { audit, requireProject } from "./common";
 
 export async function listSources(q?: string) {
   const query = q?.trim().slice(0, 80);
@@ -285,12 +286,18 @@ export async function getIipp(actor: Actor) {
 
 export async function updateIipp(
   actor: Actor,
-  input: { procedures: Record<string, { procedure?: string; responsible?: string }>; claim?: string },
+  input: { procedures: Record<string, { procedure?: string; responsible?: string }>; claim?: string; header?: unknown },
 ) {
   assertCan(actor, "write_operations");
   const program = await getIipp(actor);
+  const header = parseInput(iippHeaderSchema, input.header ?? {});
   const claim = (input.claim ?? "").trim();
-  let anyContent = claim.length > 0;
+  let anyContent =
+    claim.length > 0 ||
+    header.title.length > 0 ||
+    header.revisionLabel.length > 0 ||
+    Boolean(header.administratorName) ||
+    Boolean(header.annualReviewOn);
   await prisma.$transaction(async (tx) => {
     for (const element of program.elements) {
       const entry = input.procedures[element.key] ?? {};
@@ -302,16 +309,142 @@ export async function updateIipp(
         data: { userProcedure, responsibleName },
       });
     }
+    const status = anyContent ? "IN_PROGRESS" : "TEMPLATE";
     await tx.iippProgram.update({
       where: { id: program.id },
       data: {
-        status: anyContent ? "IN_PROGRESS" : "TEMPLATE",
+        status,
+        title: header.title,
+        revisionLabel: header.revisionLabel,
+        administratorName: header.administratorName,
+        administratorTitle: header.administratorTitle,
+        annualReviewOn: header.annualReviewOn,
         implementationClaim: claim.length >= 10 ? claim.slice(0, 2000) : null,
         claimRecordedAt: claim.length >= 10 ? new Date() : null,
       },
     });
-    await audit(tx, actor, "update_iipp", "IippProgram", program.id, { status: anyContent ? "IN_PROGRESS" : "TEMPLATE" });
+    await audit(tx, actor, "update_iipp", "IippProgram", program.id, { status });
   });
+}
+
+export async function getIippVault(actor: Actor) {
+  const program = await getIipp(actor);
+  const revisions = await prisma.iippRevision.findMany({
+    where: { organizationId: actor.organizationId, programId: program.id },
+    orderBy: { createdAt: "desc" },
+    take: 40,
+  });
+  const live = revisions.find((revision) => revision.state === "VERIFIED" || revision.state === "ACTIVE") ?? null;
+  const differs = live ? !samePlan(programShape(program), revisionShape(live)) : false;
+  return { program, revisions, live, differs };
+}
+
+function assertReadyToPublish(program: {
+  title: string;
+  revisionLabel: string;
+  administratorName: string | null;
+  annualReviewOn: Date | null;
+}) {
+  const administrator = program.administratorName?.trim() ?? "";
+  if (program.title.trim().length < 2 || program.revisionLabel.trim().length < 1 || administrator.length < 2 || !program.annualReviewOn) {
+    throw new AppError("iipp_incomplete");
+  }
+}
+
+export async function publishIippRevision(actor: Actor) {
+  assertCan(actor, "write_operations");
+  const program = await getIipp(actor);
+  assertReadyToPublish(program);
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM iipp_programs WHERE id = ${program.id} FOR UPDATE`;
+    await tx.iippRevision.updateMany({
+      where: { programId: program.id, organizationId: actor.organizationId, state: { in: ["ACTIVE", "VERIFIED"] } },
+      data: { state: "SUPERSEDED" },
+    });
+    const revision = await tx.iippRevision.create({
+      data: {
+        organizationId: actor.organizationId,
+        programId: program.id,
+        title: program.title.trim(),
+        revisionLabel: program.revisionLabel.trim(),
+        administratorName: program.administratorName?.trim() || null,
+        administratorTitle: program.administratorTitle?.trim() || null,
+        annualReviewOn: program.annualReviewOn,
+        implementationClaim: program.implementationClaim,
+        elementSnapshot: snapshotElements(program.elements),
+        state: "ACTIVE",
+        createdById: actor.userId,
+      },
+    });
+    await audit(tx, actor, "publish_iipp_revision", "IippRevision", revision.id, { state: "ACTIVE" });
+    return revision;
+  });
+}
+
+export async function markIippVerified(actor: Actor) {
+  assertCan(actor, "write_operations");
+  const program = await getIipp(actor);
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM iipp_programs WHERE id = ${program.id} FOR UPDATE`;
+    const active = await tx.iippRevision.findFirst({
+      where: { organizationId: actor.organizationId, programId: program.id, state: "ACTIVE" },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!active) throw new AppError("iipp_not_active");
+    const revision = await tx.iippRevision.update({
+      where: { id: active.id },
+      data: { state: "VERIFIED", verifiedAt: new Date() },
+    });
+    await audit(tx, actor, "verify_iipp_revision", "IippRevision", revision.id, { state: "VERIFIED" });
+    return revision;
+  });
+}
+
+export async function listIippSubmittals(actor: Actor, projectId?: string) {
+  const scoped = projectId?.trim() || "";
+  if (scoped) {
+    const project = await prisma.project.findFirst({
+      where: { id: scoped, organizationId: actor.organizationId },
+      select: { id: true },
+    });
+    if (!project) return [];
+  }
+  return prisma.iippSubmittal.findMany({
+    where: { organizationId: actor.organizationId, ...(scoped ? { projectId: scoped } : {}) },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    include: { project: { select: { id: true, name: true } } },
+  });
+}
+
+export async function createIippSubmittal(actor: Actor, input: unknown) {
+  assertCan(actor, "write_operations");
+  const data = parseInput(iippSubmittalSchema, input);
+  await requireProject(actor, data.projectId);
+  const submittal = await prisma.iippSubmittal.create({
+    data: {
+      organizationId: actor.organizationId,
+      projectId: data.projectId,
+      companyName: data.companyName,
+      note: data.note,
+      status: "PENDING_REVIEW",
+      createdById: actor.userId,
+    },
+  });
+  await audit(prisma, actor, "create_iipp_submittal", "IippSubmittal", submittal.id, { status: submittal.status });
+  return submittal;
+}
+
+export async function setIippSubmittalStatus(actor: Actor, id: string, status: "PENDING_REVIEW" | "APPROVED") {
+  assertCan(actor, "write_operations");
+  const existing = await prisma.iippSubmittal.findFirst({ where: { id, organizationId: actor.organizationId } });
+  if (!existing) throw new AppError("not_found");
+  const submittal = await prisma.iippSubmittal.update({
+    where: { id },
+    data: { status, reviewedAt: status === "APPROVED" ? new Date() : null },
+  });
+  await audit(prisma, actor, "set_iipp_submittal_status", "IippSubmittal", id, { status });
+  return submittal;
 }
 
 export async function listAudit(actor: Actor) {

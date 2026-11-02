@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
 import { EnumOptions, PageHeader, Pager, SelectField, TextArea, TextField } from "@/components/fields";
+import { StatusPill } from "@/components/status-pill";
 import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
-import { listProjects } from "@/lib/services/work";
+import { listProjects, listTailgateCadence } from "@/lib/services/work";
+import { formatDateOnly } from "@/lib/time";
 import { createProjectAction } from "@/server/actions";
 
 const owners = ["PRIVATE", "PUBLIC_AGENCY", "SCHOOL_OR_COLLEGE", "SPECIAL_DISTRICT", "HOMEOWNER", "UNKNOWN"] as const;
@@ -14,7 +16,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const [actor, locale] = await Promise.all([getActor(), getLocale()]);
   const archived = params.archived === "1";
-  const result = await listProjects(actor, { page: params.page, q: params.q, archived });
+  const [result, cadence] = await Promise.all([
+    listProjects(actor, { page: params.page, q: params.q, archived }),
+    archived ? Promise.resolve([]) : listTailgateCadence(actor),
+  ]);
+  const cadenceById = new Map(cadence.map((row) => [row.id, row]));
   const canWrite = actor.role !== "WORKER";
   return (
     <div>
@@ -30,13 +36,25 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       </p>
       <ul className="space-y-3">
         {result.items.length === 0 ? <li className="text-sm text-muted">{t(locale, "empty.projects")}</li> : null}
-        {result.items.map((project) => (
-          <li key={project.id} className="card">
-            <Link className="text-lg font-semibold text-navy underline" href={`/app/projects/${project.id}`}>{project.name}</Link>
-            <p className="text-sm text-muted">{project.city}, {project.county} County · {t(locale, `enum.ProjectStatus.${project.status}`)}</p>
-            {!project.jurisdictionConfirmed ? <p className="note mt-2">{t(locale, "hints.jurisdiction")}</p> : null}
-          </li>
-        ))}
+        {result.items.map((project) => {
+          const row = cadenceById.get(project.id);
+          return (
+            <li key={project.id} className="card">
+              <Link className="text-lg font-semibold text-navy underline" href={`/app/projects/${project.id}`}>{project.name}</Link>
+              <p className="text-sm text-muted">{project.city}, {project.county} County · {t(locale, `enum.ProjectStatus.${project.status}`)}</p>
+              {row ? (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                  <span>
+                    {t(locale, "tailgate.last")}: {formatDateOnly(locale, row.lastAt)}
+                  </span>
+                  <StatusPill tone={row.cadence === "ON_TIME" ? "ok" : "due"}>{t(locale, `enum.TailgateCadence.${row.cadence}`)}</StatusPill>
+                  <Link className="underline" href={`/app/tailgates?project=${project.id}`}>{t(locale, "nav.tailgates")}</Link>
+                </p>
+              ) : null}
+              {!project.jurisdictionConfirmed ? <p className="note mt-2">{t(locale, "hints.jurisdiction")}</p> : null}
+            </li>
+          );
+        })}
       </ul>
       <Pager page={result.page} total={result.total} pageSize={result.pageSize} previous={t(locale, "common.prev")} next={t(locale, "common.next")} hrefFor={(page) => `/app/projects?page=${page}${archived ? "&archived=1" : ""}`} />
       {canWrite ? (

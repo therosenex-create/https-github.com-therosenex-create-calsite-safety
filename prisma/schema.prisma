@@ -54,6 +54,11 @@ enum MeetingStatus {
   ARCHIVED
 }
 
+enum MeetingKind {
+  GENERAL
+  TAILGATE
+}
+
 enum PolicyBasis {
   COMPANY_POLICY
   CONTRACT_REQUIREMENT
@@ -183,6 +188,17 @@ enum IippStatus {
   IN_PROGRESS
 }
 
+enum IippRevisionState {
+  ACTIVE
+  VERIFIED
+  SUPERSEDED
+}
+
+enum IippSubmittalStatus {
+  PENDING_REVIEW
+  APPROVED
+}
+
 enum TaskBasis {
   USER_ENTERED
   REQUIREMENT_UNVERIFIED
@@ -231,6 +247,9 @@ model Organization {
   incidents                  IncidentReport[]
   documents                  SafetyDocument[]
   iipp                       IippProgram?
+  iippRevisions              IippRevision[]
+  iippSubmittals             IippSubmittal[]
+  meetingAcknowledgments     MeetingAcknowledgment[]
   companyRequirements        CompanyRequirement[]
   projectRequirements        ProjectRequirement[]
   evidenceLinks              ComplianceEvidenceLink[]
@@ -329,6 +348,7 @@ model Project {
   contractDocuments      ContractDocument[]
   contractDrafts         ContractDraft[]
   contractImpactReviews  ContractImpactReview[]
+  iippSubmittals         IippSubmittal[]
 
   @@index([organizationId, status])
   @@map("projects")
@@ -387,15 +407,18 @@ model SafetyMeeting {
   followUp          String?             @map("follow_up") @db.Text
   notes             String?             @db.Text
   status            MeetingStatus       @default(SCHEDULED)
+  meetingKind       MeetingKind         @default(GENERAL) @map("meeting_kind")
   createdById       String              @map("created_by_id")
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
   organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   project           Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
   attendance        MeetingAttendance[]
+  acknowledgments   MeetingAcknowledgment[]
   evidenceLinks     ComplianceEvidenceLink[]
 
   @@index([organizationId, scheduledAt])
+  @@index([organizationId, meetingKind])
   @@map("safety_meetings")
 }
 
@@ -414,6 +437,23 @@ model MeetingAttendance {
   @@unique([meetingId, employeeId])
   @@index([organizationId])
   @@map("meeting_attendance")
+}
+
+model MeetingAcknowledgment {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  meetingId      String        @map("meeting_id")
+  signerName     String        @map("signer_name")
+  roleLabel      String        @map("role_label")
+  signedAt       DateTime      @map("signed_at")
+  method         String        @default("typed_name")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  meeting        SafetyMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([meetingId])
+  @@map("meeting_acknowledgments")
 }
 
 model TrainingRecord {
@@ -556,15 +596,21 @@ model SafetyDocument {
 }
 
 model IippProgram {
-  id                    String       @id @default(cuid())
-  organizationId        String       @unique @map("organization_id")
-  status                IippStatus   @default(TEMPLATE)
-  implementationClaim   String?      @map("implementation_claim") @db.Text
-  claimRecordedAt       DateTime?    @map("claim_recorded_at")
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
-  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  id                    String         @id @default(cuid())
+  organizationId        String         @unique @map("organization_id")
+  status                IippStatus     @default(TEMPLATE)
+  title                 String         @default("")
+  revisionLabel         String         @default("") @map("revision_label")
+  administratorName     String?        @map("administrator_name")
+  administratorTitle    String?        @map("administrator_title")
+  annualReviewOn        DateTime?      @map("annual_review_on")
+  implementationClaim   String?        @map("implementation_claim") @db.Text
+  claimRecordedAt       DateTime?      @map("claim_recorded_at")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+  organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   elements              IippElement[]
+  revisions             IippRevision[]
 
   @@map("iipp_programs")
 }
@@ -584,6 +630,47 @@ model IippElement {
 
   @@unique([programId, key])
   @@map("iipp_elements")
+}
+
+model IippRevision {
+  id                  String            @id @default(cuid())
+  organizationId      String            @map("organization_id")
+  programId           String            @map("program_id")
+  title               String
+  revisionLabel       String            @map("revision_label")
+  administratorName   String?           @map("administrator_name")
+  administratorTitle  String?           @map("administrator_title")
+  annualReviewOn      DateTime?         @map("annual_review_on")
+  implementationClaim String?           @map("implementation_claim") @db.Text
+  elementSnapshot     Json              @map("element_snapshot")
+  state               IippRevisionState @default(ACTIVE)
+  verifiedAt          DateTime?         @map("verified_at")
+  createdById         String            @map("created_by_id")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  organization        Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  program             IippProgram       @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([programId, state])
+  @@map("iipp_revisions")
+}
+
+model IippSubmittal {
+  id             String               @id @default(cuid())
+  organizationId String               @map("organization_id")
+  projectId      String               @map("project_id")
+  companyName    String               @map("company_name")
+  note           String?              @db.Text
+  status         IippSubmittalStatus  @default(PENDING_REVIEW)
+  reviewedAt     DateTime?            @map("reviewed_at")
+  createdById    String               @map("created_by_id")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, projectId])
+  @@map("iipp_submittals")
 }
 
 model Agency {

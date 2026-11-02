@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StatusPill } from "@/components/status-pill";
 import { t } from "@/lib/i18n";
 import { formatDateOnly, formatPacific } from "@/lib/time";
 import { getActor, getLocale } from "@/lib/session";
@@ -27,6 +28,25 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-muted">{t(locale, key)}</p>
           </Link>
         ))}
+        <Link href="/app/iipp" className="card block">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t(locale, "dash.iipp")}</p>
+          <p className="mt-2 text-2xl font-semibold text-navy">{t(locale, `enum.IippDisplay.${dash.iipp.state}`)}</p>
+          <p className="mt-1 text-sm text-muted">
+            {t(locale, "iipp.annual")}: {formatDateOnly(locale, dash.iipp.annualReviewOn)}
+          </p>
+        </Link>
+        <Link href="/app/tailgates" className="card block">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{t(locale, "dash.tailgates")}</p>
+          <p className="mt-2 flex flex-wrap gap-2">
+            <StatusPill tone="ok">
+              {dash.tailgates.onTime} {t(locale, "tailgate.onTime")}
+            </StatusPill>
+            <StatusPill tone={dash.tailgates.reviewDue > 0 ? "due" : "neutral"}>
+              {dash.tailgates.reviewDue} {t(locale, "tailgate.reviewDue")}
+            </StatusPill>
+          </p>
+          <p className="mt-2 text-sm text-muted">{t(locale, "tailgate.workingDays")}</p>
+        </Link>
       </div>
       <section className="mt-8">
         <h2 className="font-serif text-2xl text-navy">{t(locale, "dash.tasks")}</h2>

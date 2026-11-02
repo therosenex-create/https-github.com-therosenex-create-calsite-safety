@@ -6,16 +6,17 @@ import { setLocaleAction, signOutAction } from "@/server/actions";
 const primary = [
   ["/app", "nav.dashboard"],
   ["/app/projects", "nav.projects"],
-  ["/app/meetings", "nav.meetings"],
-  ["/app/inspections", "nav.inspections"],
+  ["/app/tailgates", "nav.tailgates"],
+  ["/app/iipp", "nav.iipp"],
 ] as const;
 
 const more = [
+  ["/app/inspections", "nav.inspections"],
+  ["/app/meetings", "nav.meetings"],
   ["/app/employees", "nav.people"],
   ["/app/training", "nav.training"],
   ["/app/incidents", "nav.incidents"],
   ["/app/documents", "nav.files"],
-  ["/app/iipp", "nav.iipp"],
   ["/app/regulatory", "nav.requirements"],
   ["/app/regulatory/reviews", "nav.reviews"],
   ["/app/licensing", "nav.licensing"],

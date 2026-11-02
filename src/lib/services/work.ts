@@ -8,6 +8,8 @@ import { assertAllowedFile, safeFileName } from "../files";
 import { sha256 } from "../fingerprint";
 import { getBlobStore, readStoredBlob } from "../storage";
 import { pageArgs, type Page } from "../pagination";
+import { tailgateCompliance, tailgateTopic } from "../tailgate-topics";
+import { pacificLocalToUtc } from "../time";
 import {
   correctiveActionSchema,
   documentSchema,
@@ -18,9 +20,11 @@ import {
   meetingSchema,
   parseInput,
   projectSchema,
+  tailgateSchema,
   trainingSchema,
   type CorrectiveInput,
 } from "../validation";
+import { tailgateCadence } from "../working-days";
 import { audit, requireEmployee, requireInspection, requireMeeting, requireProject } from "./common";
 
 const USER_DATE_NOTE = "Due date was entered by a user. It was not calculated from a statute.";
@@ -292,6 +296,126 @@ export async function createMeeting(actor: Actor, input: unknown) {
   return meeting;
 }
 
+export async function createTailgate(actor: Actor, input: unknown) {
+  assertCan(actor, "write_operations");
+  const data = parseInput(tailgateSchema, input);
+  await requireProject(actor, data.projectId);
+  const topic = tailgateTopic(data.topicCode);
+  if (!topic) throw new AppError("invalid", "topicCode");
+  const scheduledAt = pacificLocalToUtc(`${data.conductedOn.toISOString().slice(0, 10)}T07:00`);
+  const signedAt = new Date();
+  const meeting = await prisma.safetyMeeting.create({
+    data: {
+      organizationId: actor.organizationId,
+      createdById: actor.userId,
+      projectId: data.projectId,
+      title: topic.titleEn,
+      topic: topic.titleEn,
+      language: data.language,
+      scheduledAt,
+      leaderName: data.conductorName,
+      policyBasis: "COMPANY_POLICY",
+      requirementCode: topic.citation,
+      status: "COMPLETE",
+      meetingKind: "TAILGATE",
+      acknowledgments: {
+        create: [
+          {
+            organizationId: actor.organizationId,
+            signerName: data.signatureName,
+            roleLabel: "conductor",
+            signedAt,
+            method: "typed_name",
+          },
+          ...data.roster.map((signerName) => ({
+            organizationId: actor.organizationId,
+            signerName,
+            roleLabel: "attendee",
+            signedAt,
+            method: "typed_name",
+          })),
+        ],
+      },
+    },
+  });
+  await audit(prisma, actor, "create_tailgate", "SafetyMeeting", meeting.id, {
+    citation: topic.citation,
+    attendees: data.roster.length,
+  });
+  return meeting;
+}
+
+export async function listTailgates(actor: Actor, opts: { page?: string; projectId?: string } = {}) {
+  const paging = pageArgs(opts.page);
+  const projectId = opts.projectId?.trim() || "";
+  if (projectId) {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, organizationId: actor.organizationId },
+      select: { id: true },
+    });
+    if (!project) return { items: [], total: 0, page: paging.page, pageSize: paging.pageSize };
+  }
+  const where = {
+    organizationId: actor.organizationId,
+    meetingKind: "TAILGATE" as const,
+    status: { not: "ARCHIVED" as const },
+    ...(projectId ? { projectId } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    prisma.safetyMeeting.findMany({
+      where,
+      orderBy: { scheduledAt: "desc" },
+      skip: paging.skip,
+      take: paging.take,
+      include: {
+        project: { select: { id: true, name: true } },
+        acknowledgments: { select: { roleLabel: true, signedAt: true } },
+      },
+    }),
+    prisma.safetyMeeting.count({ where }),
+  ]);
+  const items = rows.map((meeting) => ({ ...meeting, ...tailgateCompliance(meeting.acknowledgments) }));
+  return { items, total, page: paging.page, pageSize: paging.pageSize };
+}
+
+export async function projectTailgateStatus(actor: Actor, projectId: string) {
+  await requireProject(actor, projectId);
+  const last = await prisma.safetyMeeting.findFirst({
+    where: { organizationId: actor.organizationId, projectId, meetingKind: "TAILGATE", status: "COMPLETE" },
+    orderBy: { scheduledAt: "desc" },
+    select: { scheduledAt: true },
+  });
+  return { lastAt: last?.scheduledAt ?? null, cadence: tailgateCadence(last?.scheduledAt ?? null) };
+}
+
+export async function listTailgateCadence(actor: Actor) {
+  const projects = await prisma.project.findMany({
+    where: { organizationId: actor.organizationId, status: "ACTIVE" },
+    orderBy: { name: "asc" },
+    take: 200,
+    select: { id: true, name: true },
+  });
+  if (projects.length === 0) return [];
+  const meetings = await prisma.safetyMeeting.findMany({
+    where: {
+      organizationId: actor.organizationId,
+      meetingKind: "TAILGATE",
+      status: "COMPLETE",
+      projectId: { in: projects.map((project) => project.id) },
+    },
+    orderBy: { scheduledAt: "desc" },
+    select: { projectId: true, scheduledAt: true },
+  });
+  const latest = new Map<string, Date>();
+  for (const meeting of meetings) {
+    if (meeting.projectId && !latest.has(meeting.projectId)) latest.set(meeting.projectId, meeting.scheduledAt);
+  }
+  return projects.map((project) => {
+    const lastAt = latest.get(project.id) ?? null;
+    return { ...project, lastAt, cadence: tailgateCadence(lastAt) };
+  });
+}
+
 export async function updateMeeting(actor: Actor, id: string, input: unknown) {
   assertCan(actor, "write_operations");
   const existing = await requireMeeting(actor, id);
@@ -354,6 +478,7 @@ export async function getMeeting(actor: Actor, id: string) {
     include: {
       project: { select: { id: true, name: true } },
       attendance: { include: { employee: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+      acknowledgments: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!meeting) throw new AppError("not_found");
@@ -917,7 +1042,7 @@ export async function readDocumentFile(actor: Actor, id: string) {
 export async function getDashboard(actor: Actor) {
   const organizationId = actor.organizationId;
   const worker = actor.role === "WORKER";
-  const [activeProjects, unconfirmed, openActions, imminent, openIncidents, openTasks, meetings, trainings] = await Promise.all([
+  const [activeProjects, unconfirmed, openActions, imminent, openIncidents, openTasks, meetings, trainings, iippProgram, cadence] = await Promise.all([
     prisma.project.count({ where: { organizationId, status: "ACTIVE" } }),
     prisma.project.count({ where: { organizationId, jurisdictionConfirmed: false, status: { not: "ARCHIVED" } } }),
     prisma.correctiveAction.count({ where: { organizationId, status: "OPEN" } }),
@@ -938,8 +1063,40 @@ export async function getDashboard(actor: Actor) {
       take: 5,
       include: { employee: { select: { firstName: true, lastName: true } } },
     }),
+    prisma.iippProgram.findUnique({
+      where: { organizationId },
+      include: {
+        revisions: {
+          where: { state: { in: ["ACTIVE", "VERIFIED"] } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    }),
+    listTailgateCadence(actor),
   ]);
-  return { activeProjects, unconfirmed, openActions, imminent, openIncidents, openTasks, meetings, trainings };
+  const live = iippProgram?.revisions[0] ?? null;
+  const iippState =
+    live?.state === "VERIFIED" || live?.state === "ACTIVE" ? live.state : iippProgram?.status === "IN_PROGRESS" ? "IN_PROGRESS" : "TEMPLATE";
+  return {
+    activeProjects,
+    unconfirmed,
+    openActions,
+    imminent,
+    openIncidents,
+    openTasks,
+    meetings,
+    trainings,
+    iipp: {
+      state: iippState,
+      title: live?.title || iippProgram?.title || "",
+      annualReviewOn: live?.annualReviewOn ?? iippProgram?.annualReviewOn ?? null,
+    },
+    tailgates: {
+      onTime: cadence.filter((row) => row.cadence === "ON_TIME").length,
+      reviewDue: cadence.filter((row) => row.cadence === "REVIEW_DUE").length,
+    },
+  };
 }
 
 export async function listOpenTasks(actor: Actor) {
