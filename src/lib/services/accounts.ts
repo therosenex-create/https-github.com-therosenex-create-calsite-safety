@@ -3,6 +3,7 @@ import type { Actor } from "../actor";
 import { assertCan } from "../authz";
 import { prisma } from "../db";
 import { AppError } from "../errors";
+import { logServerEvent } from "../log";
 import { IIPP_ELEMENTS } from "../iipp-template";
 import { isLoginLimited, loginWindowStart } from "../rate-limit";
 import { hashPassword, verifyPassword } from "../password";
@@ -94,11 +95,15 @@ export async function authenticate(email: string, password: string) {
   if (!user) {
     await hashPassword(password);
     await recordLoginAttempt(normalized, false);
+    logServerEvent("auth_failed", { email: normalized });
     return null;
   }
   const matches = await verifyPassword(password, user.passwordHash);
   await recordLoginAttempt(normalized, matches);
-  if (!matches) return null;
+  if (!matches) {
+    logServerEvent("auth_failed", { email: normalized });
+    return null;
+  }
   return user;
 }
 

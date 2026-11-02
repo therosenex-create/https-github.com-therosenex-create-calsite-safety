@@ -32,6 +32,7 @@ const rows = [
   ["nav.more", "More", "Más"],
   ["nav.signIn", "Sign in", "Entrar"],
   ["nav.signOut", "Sign out", "Salir"],
+  ["nav.skip", "Skip to content", "Saltar al contenido"],
   ["nav.signUp", "Create company", "Crear empresa"],
   ["actions.save", "Save", "Guardar"],
   ["actions.create", "Create", "Crear"],

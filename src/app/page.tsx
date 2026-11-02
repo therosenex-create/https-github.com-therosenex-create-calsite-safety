@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PublicHeader } from "@/components/shell";
+import { PublicHeader, SkipLink } from "@/components/shell";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/session";
 
@@ -7,8 +7,9 @@ export default async function HomePage() {
   const locale = await getLocale();
   return (
     <>
+      <SkipLink locale={locale} />
       <PublicHeader locale={locale} />
-      <main className="mx-auto max-w-5xl px-4 py-10">
+      <main id="content" className="mx-auto max-w-5xl px-4 py-10">
         <p className="text-sm font-semibold uppercase tracking-wide text-amber">{t(locale, "tagline")}</p>
         <h1 className="mt-3 max-w-3xl font-serif text-4xl leading-tight text-navy md:text-5xl">{t(locale, "landing.lead")}</h1>
         <p className="mt-4 max-w-2xl text-lg text-muted">{t(locale, "landing.for")}</p>

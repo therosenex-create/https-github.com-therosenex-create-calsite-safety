@@ -45,12 +45,18 @@ function NavLinks({ locale, items, className }: { locale: Locale; items: readonl
   );
 }
 
+export function SkipLink({ locale }: { locale: Locale }) {
+  return (
+    <a className="sr-only focus:not-sr-only focus-visible:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:bg-white focus:px-3 focus:py-2" href="#content">
+      {t(locale, "nav.skip")}
+    </a>
+  );
+}
+
 export function Shell({ actor, locale, children }: { actor: Actor; locale: Locale; children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
-      <a className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:bg-white focus:px-3 focus:py-2" href="#content">
-        Skip
-      </a>
+      <SkipLink locale={locale} />
       <header className="sticky top-0 z-30 border-b border-white/10 bg-navy text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <div>
@@ -122,7 +128,7 @@ export function PublicHeader({ locale }: { locale: Locale }) {
         <Link href="/" className="font-serif text-2xl">
           {t(locale, "brand")}
         </Link>
-        <div className="flex items-center gap-2">
+        <nav className="flex items-center gap-2" aria-label="Public">
           <form action={setLocaleAction}>
             <input type="hidden" name="locale" value={locale === "es" ? "en" : "es"} />
             <button className="min-h-11 rounded-md px-3 text-sm font-semibold" type="submit">
@@ -132,7 +138,7 @@ export function PublicHeader({ locale }: { locale: Locale }) {
           <Link className="btn bg-white text-navy" href="/sign-in">
             {t(locale, "nav.signIn")}
           </Link>
-        </div>
+        </nav>
       </div>
       <p className="bg-navy-800 px-4 py-2 text-center text-xs leading-5">{t(locale, "banner")}</p>
     </header>
