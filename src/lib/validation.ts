@@ -281,10 +281,18 @@ export const permitSchema = z.object({
   jurisdictionLabel: text(2, 160),
   permitType: text(2, 120),
   permitNumber: optionalText(80),
-  status: z.enum(["NOT_STARTED", "DRAFT", "SUBMITTED", "CORRECTIONS", "USER_REPORTED_APPROVAL", "CLOSED", "UNKNOWN"]),
+  status: z.enum(["NOT_STARTED", "DRAFT", "SUBMITTED", "CORRECTIONS", "USER_REPORTED_APPROVAL", "ISSUED", "CLOSED", "UNKNOWN"]),
   appliedOn: dateOnly,
+  issuedOn: dateOnly,
+  expiresOn: dateOnly,
+  closedOn: dateOnly,
   notes: optionalText(4000),
   officialUrl: optionalUrl,
+  documentId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  permitCategory: z
+    .union([z.enum(["building", "demolition", "electrical", "mechanical", "plumbing", "grading", "excavation", "encroachment", "fire", "other", "custom"]), z.literal("")])
+    .optional()
+    .transform((value) => value || undefined),
 });
 
 export const heatPlanSchema = z.object({
@@ -326,6 +334,45 @@ export const citySourceSchema = z.object({
   subject: text(2, 160),
   officialUrl: optionalUrl,
   notes: text(20, 4000),
+  agencyKind: z
+    .union([z.enum(["CITY", "COUNTY", "FIRE", "WATER", "SCHOOL_DISTRICT", "CALTRANS_DISTRICT", "OTHER"]), z.literal("")])
+    .optional()
+    .transform((value) => value || undefined),
+  contactName: optionalText(120),
+  contactPhone: optionalText(40),
+  contactEmail: optionalText(200),
+  caltransDistrictNote: optionalText(500),
+});
+
+export const localRuleSchema = z.object({
+  projectId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  requirementId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  topic: z.enum(["LOCAL_AMENDMENT", "FIRE_APPROVAL", "ENVIRONMENTAL", "RIGHT_OF_WAY", "OTHER"]),
+  ruleText: text(10, 4000),
+  citationUrl: optionalUrl,
+  rationale: optionalText(2000),
+  reviewStatus: z
+    .union([z.enum(["UNREVIEWED", "PENDING_QUALIFIED_REVIEW", "SOURCE_LINKED", "NEEDS_UPDATE"]), z.literal("")])
+    .optional()
+    .transform((value) => value || undefined),
+  documentId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+});
+
+export const closeoutSchema = z.object({
+  projectId: z.string().trim().min(1, "too_small"),
+  itemKey: z.enum([
+    "REGISTRATION_NOTE",
+    "DETERMINATION_ID",
+    "PAYROLL_DRAFTS",
+    "APPRENTICESHIP_NOTE",
+    "FINAL_PAYROLL",
+    "FINAL_DOCS",
+    "SIGNOFF",
+  ]),
+  note: optionalText(4000),
+  documentId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  signoffName: optionalText(120),
+  acknowledgedNotASignature: z.string().optional().or(z.literal("")),
 });
 
 export const inviteSchema = z.object({

@@ -420,6 +420,41 @@ async function main() {
     });
   }
 
+  await prisma.citySource.upsert({
+    where: { id: "demo-city-source" },
+    update: {},
+    create: {
+      id: "demo-city-source",
+      organizationId: organization.id,
+      cityName: "Oakland",
+      countyName: "Alameda",
+      subject: "Demonstration building counter contact",
+      agencyKind: "CITY",
+      contactName: "Demonstration counter",
+      notes: "Demonstration record only. No Oakland ordinance was loaded or copied.",
+      reviewStatus: "UNREVIEWED",
+      createdById: admin.id,
+    },
+  });
+  await prisma.permitRecord.upsert({
+    where: { id: "demo-permit" },
+    update: {},
+    create: {
+      id: "demo-permit",
+      organizationId: organization.id,
+      projectId: remodel.id,
+      authorityName: "Demonstration building counter",
+      jurisdictionLabel: "Oakland",
+      permitType: "Building permit pointer",
+      permitCategory: "building",
+      permitNumber: null,
+      status: "DRAFT",
+      notes: "Demonstration record. Not filed with any agency.",
+      sourceReviewStatus: "UNREVIEWED",
+      createdById: admin.id,
+    },
+  });
+
   console.log("Seeded catalog and Pacific Ridge Builders demonstration company.");
   console.log("Demo emails: demo.admin@calsite.example, demo.safety@calsite.example, demo.worker@calsite.example");
 }
