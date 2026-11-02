@@ -14,4 +14,10 @@ export const PARTIALLY_READ_CODES = [
   "CCR-T8-1541-1",
   "CCR-T8-5141-1",
   "CCR-T8-1532-1",
+  "CCR-T8-1731",
+  "CCR-T8-1510",
+  "CCR-T8-1529",
+  "CCR-T8-1541-1-APP-A",
+  "CCR-T8-1541-1-APP-B",
+  "CCR-T8-1541-1-APP-C",
 ] as const;

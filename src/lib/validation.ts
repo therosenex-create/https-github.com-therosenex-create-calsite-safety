@@ -287,6 +287,39 @@ export const permitSchema = z.object({
   officialUrl: optionalUrl,
 });
 
+export const heatPlanSchema = z.object({
+  projectId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  waterProcedure: text(10, 4000),
+  shadeProcedure: text(10, 4000),
+  highHeatProcedure: text(10, 4000),
+  emergencyProcedure: text(10, 4000),
+  trainingNote: optionalText(2000),
+});
+
+export const smokePlanSchema = z.object({
+  projectId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  manualCheckProcedure: text(20, 4000),
+  controlNote: text(10, 4000),
+  respiratorNote: optionalText(2000),
+});
+
+export const publicWorksSchema = z.object({
+  projectId: z.string().trim().min(1, "too_small"),
+  awardingBody: text(2, 160),
+  registrationEvidenceNote: text(20, 4000),
+  registrationDocumentId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  wageDeterminationId: optionalText(120),
+  wageNote: text(10, 2000),
+  apprenticeshipCraft: optionalText(120),
+  apprenticeshipNote: optionalText(2000),
+});
+
+export const payrollDraftSchema = z.object({
+  projectId: z.string().trim().min(1, "too_small"),
+  weekEnding: requiredDateOnly,
+  note: text(10, 2000),
+});
+
 export const citySourceSchema = z.object({
   cityName: text(2, 80),
   countyName: text(2, 80),

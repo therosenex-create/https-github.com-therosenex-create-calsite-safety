@@ -6,6 +6,7 @@ import { prisma } from "../db";
 import { AppError } from "../errors";
 import { assertAllowedFile, safeFileName } from "../files";
 import { sha256 } from "../fingerprint";
+import { getBlobStore, readStoredBlob } from "../storage";
 import { pageArgs, type Page } from "../pagination";
 import {
   correctiveActionSchema,
@@ -812,7 +813,7 @@ export async function createDocument(
   assertCan(actor, "write_operations");
   const data = parseInput(documentSchema, input);
   if (data.projectId) await requireProject(actor, data.projectId);
-  let stored: { fileName: string; mimeType: string; byteSize: number; sha256: string; contentBytes: Buffer } | null = null;
+  let stored: { fileName: string; mimeType: string; byteSize: number; sha256: string; blob: Awaited<ReturnType<ReturnType<typeof getBlobStore>["put"]>> } | null = null;
   if (file && file.bytes.byteLength > 0) {
     assertAllowedFile(file.mimeType, file.bytes.byteLength);
     stored = {
@@ -820,7 +821,7 @@ export async function createDocument(
       mimeType: file.mimeType,
       byteSize: file.bytes.byteLength,
       sha256: sha256(file.bytes),
-      contentBytes: file.bytes,
+      blob: await getBlobStore().put({ organizationId: actor.organizationId, bytes: file.bytes, fileName: file.name }),
     };
   }
   const document = await prisma.safetyDocument.create({
@@ -835,7 +836,9 @@ export async function createDocument(
       mimeType: stored?.mimeType,
       byteSize: stored?.byteSize,
       sha256: stored?.sha256,
-      contentBytes: stored ? new Uint8Array(stored.contentBytes) : undefined,
+      contentBytes: stored?.blob.bytes ? new Uint8Array(stored.blob.bytes) : undefined,
+      storageProvider: stored?.blob.provider ?? "DATABASE",
+      objectKey: stored?.blob.objectKey,
     },
   });
   await audit(prisma, actor, "create_document", "SafetyDocument", document.id, { category: document.category, hasFile: Boolean(stored) });
@@ -904,9 +907,11 @@ export async function readDocumentFile(actor: Actor, id: string) {
   const document = await prisma.safetyDocument.findFirst({
     where: { id, organizationId: actor.organizationId, archived: false },
   });
-  if (!document?.contentBytes || !document.mimeType || !document.fileName) throw new AppError("not_found");
+  if (!document?.mimeType || !document.fileName) throw new AppError("not_found");
+  const bytes = await readStoredBlob(document);
+  if (!bytes) throw new AppError("not_found");
   await audit(prisma, actor, "download_document", "SafetyDocument", id, {});
-  return document;
+  return { ...document, contentBytes: bytes };
 }
 
 export async function getDashboard(actor: Actor) {

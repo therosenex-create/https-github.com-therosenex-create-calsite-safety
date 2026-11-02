@@ -1,6 +1,7 @@
 import { AppError } from "./errors";
+import { getBlobStore } from "./storage";
 
-export const MAX_FILE_BYTES = 4 * 1024 * 1024;
+export const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
 const ALLOWED: Record<string, string> = {
   "application/pdf": "pdf",
@@ -14,7 +15,7 @@ export function assertAllowedFile(mimeType: string, byteLength: number) {
   if (!ALLOWED[mimeType]) {
     throw new AppError("file_type");
   }
-  if (byteLength > MAX_FILE_BYTES) {
+  if (byteLength > getBlobStore().limit) {
     throw new AppError("file_too_large");
   }
 }

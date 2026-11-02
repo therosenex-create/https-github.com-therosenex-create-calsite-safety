@@ -5,8 +5,8 @@ export const COVERAGE_GAPS = [
     es: "La mayor parte del Título 8 no está en este catálogo. Un resumen parcial de una sección no significa que se revisaron las secciones cercanas.",
   },
   {
-    en: "Sections 1731, 1510, 1724, and 5144 are cited by sections that were read and were not themselves extracted. Asbestos rules were not reviewed.",
-    es: "Las secciones 1731, 1510, 1724 y 5144 se citan en secciones que sí se leyeron y no se extrajeron. No se revisaron las reglas de asbesto.",
+    en: "Sections 1724, 5144, 1716.2, 1671.1, and 1671.2 are cited by sections that were read and were not themselves extracted. Asbestos section 1529 has a partial exposure-limit entry; its sampling appendix was not copied.",
+    es: "Las secciones 1724, 5144, 1716.2, 1671.1 y 1671.2 se citan en secciones leídas y no se extrajeron. La sección 1529 de asbesto tiene una entrada parcial de límites de exposición; su apéndice de muestreo no se copió.",
   },
   {
     en: "Section 1730 is not the 7 1/2 foot rule in section 1670. Section 1541.1 does not make 5 feet or a 1.5:1 slope the only excavation rule.",

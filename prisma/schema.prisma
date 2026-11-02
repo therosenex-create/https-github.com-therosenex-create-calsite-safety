@@ -239,6 +239,10 @@ model Organization {
   regulatoryReviews          RegulatoryReview[]
   permitRecords              PermitRecord[]
   citySources                CitySource[]
+  heatPlans                  HeatIllnessPlan[]
+  smokePlans                 WildfireSmokePlan[]
+  publicWorksRecords         PublicWorksRecord[]
+  payrollDrafts              CertifiedPayrollDraft[]
 
   @@map("organizations")
 }
@@ -305,6 +309,10 @@ model Project {
   evidenceLinks          ComplianceEvidenceLink[]
   tasks                  ComplianceTask[]
   permitRecords          PermitRecord[]
+  heatPlans              HeatIllnessPlan[]
+  smokePlans             WildfireSmokePlan[]
+  publicWorksRecords     PublicWorksRecord[]
+  payrollDrafts          CertifiedPayrollDraft[]
 
   @@index([organizationId, status])
   @@map("projects")
@@ -511,6 +519,8 @@ model SafetyDocument {
   byteSize       Int?         @map("byte_size")
   sha256         String?
   contentBytes   Bytes?       @map("content_bytes")
+  storageProvider String      @default("DATABASE") @map("storage_provider")
+  objectKey      String?      @map("object_key")
   archived       Boolean      @default(false)
   createdById    String       @map("created_by_id")
   createdAt      DateTime     @default(now()) @map("created_at")
@@ -881,6 +891,81 @@ model CitySource {
 
   @@index([organizationId])
   @@map("city_sources")
+}
+
+model HeatIllnessPlan {
+  id                   String       @id @default(cuid())
+  organizationId       String       @map("organization_id")
+  projectId            String?      @map("project_id")
+  waterProcedure       String       @map("water_procedure") @db.Text
+  shadeProcedure       String       @map("shade_procedure") @db.Text
+  highHeatProcedure    String       @map("high_heat_procedure") @db.Text
+  emergencyProcedure   String       @map("emergency_procedure") @db.Text
+  trainingNote         String?      @map("training_note") @db.Text
+  requirementCode      String       @default("CCR-T8-3395") @map("requirement_code")
+  createdById          String       @map("created_by_id")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project              Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("heat_illness_plans")
+}
+
+model WildfireSmokePlan {
+  id                    String       @id @default(cuid())
+  organizationId        String       @map("organization_id")
+  projectId             String?      @map("project_id")
+  manualCheckProcedure  String       @map("manual_check_procedure") @db.Text
+  controlNote           String       @map("control_note") @db.Text
+  respiratorNote        String?      @map("respirator_note") @db.Text
+  requirementCode       String       @default("CCR-T8-5141-1") @map("requirement_code")
+  createdById           String       @map("created_by_id")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project               Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("wildfire_smoke_plans")
+}
+
+model PublicWorksRecord {
+  id                         String       @id @default(cuid())
+  organizationId             String       @map("organization_id")
+  projectId                  String       @map("project_id")
+  awardingBody               String       @map("awarding_body")
+  registrationEvidenceNote   String       @map("registration_evidence_note") @db.Text
+  registrationDocumentId     String?      @map("registration_document_id")
+  registrationCheckedAt      DateTime     @map("registration_checked_at")
+  wageDeterminationId        String?      @map("wage_determination_id")
+  wageNote                   String       @map("wage_note") @db.Text
+  apprenticeshipCraft        String?      @map("apprenticeship_craft")
+  apprenticeshipNote         String?      @map("apprenticeship_note") @db.Text
+  createdById                String       @map("created_by_id")
+  createdAt                  DateTime     @default(now()) @map("created_at")
+  organization               Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project                    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, projectId])
+  @@map("public_works_records")
+}
+
+model CertifiedPayrollDraft {
+  id                String       @id @default(cuid())
+  organizationId    String       @map("organization_id")
+  projectId         String       @map("project_id")
+  weekEnding        DateTime     @map("week_ending")
+  note              String       @db.Text
+  submittedToAgency Boolean      @default(false) @map("submitted_to_agency")
+  createdById       String       @map("created_by_id")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project           Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, projectId])
+  @@map("certified_payroll_drafts")
 }
 
 model LoginAttempt {

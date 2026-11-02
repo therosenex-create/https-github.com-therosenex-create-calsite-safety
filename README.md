@@ -28,7 +28,7 @@ Auth.js is self-hosted. There is no Clerk account and no OAuth provider in this 
 - Training records. Blank expiration means no expiration was entered
 - Inspections, field prompts, findings, and corrective actions
 - Incident reports. Workers see only their own. Investigation notes are limited to admins and safety managers
-- Project file library (PDF, JPEG, PNG, WEBP, plain text, 4 MB) stored in Postgres
+- Project file library (PDF, JPEG, PNG, WEBP, plain text). The default store is Postgres, 8 MB per file, isolated by company. `DOCUMENT_STORAGE=object` fails closed until bucket variables exist, and this build does not upload to a bucket yet.
 - IIPP element workspace mapped to the headings in the DIR convenience copy of 8 CCR §3203
 - Regulatory source registry and requirement catalog for the sections reviewed on November 2, 2026
 - Company or project applicability determinations, evidence links, and a manual review flag that does not download a page
@@ -43,9 +43,20 @@ Auth.js is self-hosted. There is no Clerk account and no OAuth provider in this 
 - City, county, fire-district, or school-district ordinances
 - Most of Title 8. Partial summaries now include §1730, §1541.1, §5141.1, and §1532.1. Asbestos, §1731, §1724, and §5144 are still unread
 - Automated regulatory crawling. Change detection compares catalog text only when called in code and is not scheduled
-- Email delivery, billing, and object storage for files larger than 4 MB
+- Billing, live object-storage uploads, and invitation email. `getMailer()` records that nothing was sent
 - A distributed login rate limiter. Failed sign-ins are counted in Postgres for 15 minutes
 - Playwright in CI. Critical paths are covered in Vitest against Postgres
+- Wage rates, certified-payroll submission, and apprentice ratios. The public-works screen stores pointers and drafts only
+
+## Phase 3 additions
+
+- Public-works records with a dated registration note, an optional company file, a determination id, and an apprenticeship note. Certified payroll rows are drafts with `submittedToAgency` forced false. No dollar rates.
+- Partial Title 8 entries for §1731, §1510, §1529, and excavation appendices A–C. Appendix tables were not copied.
+- The DIR registration webpage's fee sentence is stored as an excerpt. It is not treated as a statute, and typing a number still does not verify registration.
+- Company heat and wildfire-smoke plans tied to the existing catalog codes. The smoke plan asks how the company will check the AQI. The app does not.
+- Page CSP is set in middleware with a per-request script nonce and `strict-dynamic`. Styles still allow inline CSS.
+
+`npm audit` has no critical findings after moving to Auth.js 5.0.0-beta.32 and Vitest 5.1.0. Five high findings remain, and each published fix is a major upgrade (Prisma 7, Next.js 16, or Zod 4) that this release does not take. Those packages stay on the versions the app is tested against.
 
 ## Phase 2 additions
 
