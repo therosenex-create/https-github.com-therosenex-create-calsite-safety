@@ -82,13 +82,38 @@ Apply `prisma/migrations` for Phase 5 after pull, then `npm run db:seed`. The se
 
 Apply the Phase 6 migration, then `npm run db:seed`. The seed adds one demonstration subcontract file and one unverified draft on the kitchen remodel. It does not accept the draft.
 
+## Phase 7 additions
+
+- `GET /api/health` checks Postgres with `SELECT 1` and returns `ok`, `db`, and a version token when the host set one. It does not return connection strings.
+- Failed sign-ins and unexpected action errors write a JSON line to stderr. Emails are shortened. Passwords are not logged. `SENTRY_DSN` is not read.
+- The operations runbook is `docs/OPERATIONS.md`: backup, restore, migrate order, seed refusal, `AUTH_SECRET` rotation, and a pilot checklist.
+
+No new migration.
+
+## Implementation status
+
+The later build commands numbered local permits as Master Build phase 5, contracts as phase 6, reporting as phase 7, and hardening as phase 8. Phases 1–3 in this repo are the earlier slices. There was no separate fourth product module between public works and local permits.
+
+| Master Build | In this repo | Status |
+| --- | --- | --- |
+| 1. Core records, auth, bilingual UI | Phase 1 | Shipped |
+| 2. Catalog, qualified review, session controls | Phase 2 | Shipped. Title 8 coverage is still partial |
+| 3. Public works, heat, smoke, storage and mail stubs | Phase 3 | Shipped as company records. Mail and object storage fail closed |
+| 4. No separate slice | License checks and IIPP shipped in phases 1–2 | Folded in |
+| 5. Local permits and agency registry | Phase 4 | Shipped. No live city lookup |
+| 6. Contract documents and human review | Phase 6 | Shipped. A person types the quote |
+| 7. Dashboard, packets, exports, catalog search | Phase 5 | Shipped. No compliance score |
+| 8. Production hardening | Phase 7 | Shipped as health, tests, and the runbook. A live host still needs the Owner's database and `AUTH_SECRET` |
+
+Still deferred: live agency APIs, invitation email, object-storage uploads, billing, crawlers, wage submission, Playwright, and the Prisma 7, Next.js 16, and Zod 4 upgrades.
+
 ## Phase 2 additions
 
 - Company qualified-review notes for the partially read Title 8 entries. The note does not edit the catalog and is not a certification.
 - Manual CSLB and DIR checks can attach a company file. The timestamp is the server clock. No status means CalSite verified the number.
 - Permit records and city-source notes start empty. A city name does not load an ordinance.
 - Password changes and "End sessions" increment a session version so older JWTs stop at the next request.
-- A content-security policy sets `frame-ancestors 'none'` and `object-src 'none'`. Scripts still allow `'unsafe-inline'` because this release has no nonce.
+- A content-security policy sets `frame-ancestors 'none'` and `object-src 'none'`. Phase 3 replaced the script policy with a per-request nonce.
 
 The in-app Guidance page and the regulatory catalog list these gaps in the product, not only here.
 
@@ -156,6 +181,8 @@ The app is a Next.js server app. Netlify detects Next.js from this repo (`netlif
 4. From a trusted machine, run `npx prisma migrate deploy` against that database before sending real traffic.
 5. Do not run `npm run db:seed` on a production database.
 
+Backup, restore, health checks, and session rotation are in [docs/OPERATIONS.md](docs/OPERATIONS.md). This repository does not deploy a production site by itself.
+
 Files live in Postgres, so more than one server instance can read them. There is no local upload disk. Larger plan sets should move to object storage later. Netlify Blobs is a fit for files, not for these relational records.
 
 ## Regulatory updates
@@ -171,4 +198,8 @@ Qualified safety, legal, labor, or engineering review is still required before a
 - Workers cannot create projects, inspections, or roster attendance. They can report an incident and acknowledge their own meeting when their employee email matches.
 - Closing a corrective action or an incident requires an evidence or investigation note.
 - Audit events are append-only in the application. There is no edit API. The database owner can still change rows, so this is not a tamper-proof ledger.
-- Dependency audit reports known issues in the Next.js and ESLint tree. They are recorded in the pull request and were not force-upgraded.
+- `npm audit` on this lockfile reports no critical findings and five high findings: Prisma through `deepmerge-ts`, PostCSS, and Zod. The published fixes that move Prisma to 7 or Zod to 4 are not applied. PostCSS is a build dependency and was left on the version this app already builds with. Next.js stays on 15.5.28.
+- Page CSP is set in middleware with a per-request script nonce and `strict-dynamic`. That script policy does not include `'unsafe-inline'`. Styles still allow inline CSS.
+- Accessibility checked here: skip link, header, navigation, main, labels on sign-in and sign-up, and a visible focus outline. This is not a WCAG certification.
+
+Details and the pilot checklist are in [docs/OPERATIONS.md](docs/OPERATIONS.md).

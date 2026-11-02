@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { ActionForm } from "@/components/action-form";
 import { TextField } from "@/components/fields";
-import { PublicHeader } from "@/components/shell";
+import { PublicHeader, SkipLink } from "@/components/shell";
 import { t } from "@/lib/i18n";
 import { getLocale } from "@/lib/session";
 import { signUpAction } from "@/server/actions";
@@ -13,8 +13,9 @@ export default async function SignUpPage() {
   const locale = await getLocale();
   return (
     <>
+      <SkipLink locale={locale} />
       <PublicHeader locale={locale} />
-      <main className="mx-auto max-w-md px-4 py-10">
+      <main id="content" className="mx-auto max-w-md px-4 py-10">
         <h1 className="font-serif text-3xl text-navy">{t(locale, "nav.signUp")}</h1>
         <p className="mt-2 text-sm text-muted">{t(locale, "hints.password")}</p>
         <div className="card mt-6">

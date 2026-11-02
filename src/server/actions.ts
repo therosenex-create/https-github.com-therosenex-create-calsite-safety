@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn, signOut } from "@/auth";
 import { isAppError } from "@/lib/errors";
+import { logServerEvent } from "@/lib/log";
 import { errorText, t, type Locale } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
 import {
@@ -71,7 +72,7 @@ function values(formData: FormData, keys: string[]) {
 async function fail(error: unknown): Promise<ActionState> {
   const locale = await getLocale();
   if (isAppError(error)) return { error: errorText(locale, error.code, error.field) };
-  console.error(error);
+  logServerEvent("action_failed", { name: error instanceof Error ? error.name : "unknown" });
   return { error: errorText(locale, "generic") };
 }
 
@@ -268,7 +269,7 @@ export async function acknowledgeAction(meetingId: string) {
   try {
     await acknowledgeOwnAttendance(await getActor(), meetingId);
   } catch (error) {
-    console.error(error);
+    logServerEvent("action_failed", { name: error instanceof Error ? error.name : "unknown" });
   }
   revalidatePath(`/app/meetings/${meetingId}`);
 }
@@ -363,7 +364,7 @@ export async function findingStatusAction(inspectionId: string, findingId: strin
   try {
     await setFindingStatus(await getActor(), findingId, status);
   } catch (error) {
-    console.error(error);
+    logServerEvent("action_failed", { name: error instanceof Error ? error.name : "unknown" });
   }
   revalidatePath(`/app/inspections/${inspectionId}`);
 }
@@ -532,7 +533,7 @@ export async function roleAction(membershipId: string, formData: FormData) {
   try {
     await updateMemberRole(await getActor(), membershipId, role);
   } catch (error) {
-    console.error(error);
+    logServerEvent("action_failed", { name: error instanceof Error ? error.name : "unknown" });
   }
   revalidatePath("/app/settings");
 }
