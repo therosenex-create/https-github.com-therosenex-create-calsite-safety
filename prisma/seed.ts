@@ -478,6 +478,57 @@ async function main() {
     },
   });
 
+  const contractBytes = Buffer.from("Demonstration contract excerpt. Not a real agreement. No clause was read by software.\n");
+  await prisma.safetyDocument.upsert({
+    where: { id: "demo-contract-file" },
+    update: {},
+    create: {
+      id: "demo-contract-file",
+      organizationId: organization.id,
+      projectId: remodel.id,
+      createdById: admin.id,
+      title: "Demonstration contract excerpt",
+      category: "other",
+      description: "Demonstration file only. Not a contract term.",
+      fileName: "demonstration-contract.txt",
+      mimeType: "text/plain",
+      byteSize: contractBytes.byteLength,
+      sha256: sha256(contractBytes),
+      contentBytes: contractBytes,
+    },
+  });
+  await prisma.contractDocument.upsert({
+    where: { id: "demo-contract" },
+    update: {},
+    create: {
+      id: "demo-contract",
+      organizationId: organization.id,
+      projectId: remodel.id,
+      documentId: "demo-contract-file",
+      docType: "SUBCONTRACT",
+      title: "Demonstration subcontract excerpt",
+      parties: "Demonstration parties only",
+      revisionLabel: "Demo",
+      notes: "Demonstration record. No clause was extracted by software.",
+      receivedOn: new Date("2026-10-01T00:00:00.000Z"),
+      createdById: admin.id,
+    },
+  });
+  await prisma.contractDraft.upsert({
+    where: { id: "demo-contract-draft" },
+    update: {},
+    create: {
+      id: "demo-contract-draft",
+      organizationId: organization.id,
+      projectId: remodel.id,
+      contractDocumentId: "demo-contract",
+      clauseReference: "Demonstration clause, not a real section",
+      quote: "Demonstration quote typed for the seed. Not verified and not a contract term.",
+      status: "DRAFT",
+      createdById: admin.id,
+    },
+  });
+
   console.log("Seeded catalog and Pacific Ridge Builders demonstration company.");
   console.log("Demo emails: demo.admin@calsite.example, demo.safety@calsite.example, demo.worker@calsite.example");
 }

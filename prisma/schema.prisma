@@ -186,6 +186,7 @@ enum IippStatus {
 enum TaskBasis {
   USER_ENTERED
   REQUIREMENT_UNVERIFIED
+  CONTRACT_ACCEPTED
 }
 
 enum CompanyReviewDecision {
@@ -247,6 +248,9 @@ model Organization {
   publicWorksRecords         PublicWorksRecord[]
   payrollDrafts              CertifiedPayrollDraft[]
   evidencePackets            EvidencePacket[]
+  contractDocuments          ContractDocument[]
+  contractDrafts             ContractDraft[]
+  contractImpactReviews      ContractImpactReview[]
 
   @@map("organizations")
 }
@@ -262,6 +266,8 @@ model User {
   memberships    Membership[]
   auditEvents    AuditEvent[]
   regulatoryReviews RegulatoryReview[]
+  acceptedContractDrafts ContractDraft[] @relation("ContractAcceptedBy")
+  contractImpactReviews ContractImpactReview[]
 
   @@map("users")
 }
@@ -320,6 +326,9 @@ model Project {
   publicWorksRecords     PublicWorksRecord[]
   payrollDrafts          CertifiedPayrollDraft[]
   evidencePackets        EvidencePacket[]
+  contractDocuments      ContractDocument[]
+  contractDrafts         ContractDraft[]
+  contractImpactReviews  ContractImpactReview[]
 
   @@index([organizationId, status])
   @@map("projects")
@@ -539,6 +548,8 @@ model SafetyDocument {
   permitRecords  PermitRecord[]
   localRuleNotes LocalRuleNote[]
   closeoutItems  CloseoutItem[]
+  contractDocuments ContractDocument[]
+  taskEvidence   ComplianceTask[] @relation("TaskEvidence")
 
   @@index([organizationId, archived])
   @@map("safety_documents")
@@ -682,6 +693,7 @@ model RegulatoryRequirement {
   tasks                ComplianceTask[]
   reviews              RegulatoryReview[]
   localRuleNotes       LocalRuleNote[]
+  contractDrafts       ContractDraft[]
 
   @@index([reviewStatus])
   @@map("regulatory_requirements")
@@ -826,6 +838,9 @@ model ComplianceTask {
   project           Project?          @relation(fields: [projectId], references: [id], onDelete: Restrict)
   requirement       RegulatoryRequirement? @relation(fields: [requirementId], references: [id], onDelete: Restrict)
   correctiveAction  CorrectiveAction? @relation(fields: [correctiveActionId], references: [id], onDelete: Cascade)
+  evidenceDocumentId String?          @map("evidence_document_id")
+  evidenceDocument   SafetyDocument?  @relation("TaskEvidence", fields: [evidenceDocumentId], references: [id], onDelete: Restrict)
+  contractDraft      ContractDraft?
 
   @@index([organizationId, status])
   @@map("compliance_tasks")
@@ -933,6 +948,7 @@ model LocalRuleNote {
   project          Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   requirement      RegulatoryRequirement? @relation(fields: [requirementId], references: [id], onDelete: Restrict)
   document         SafetyDocument? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  contractDraft    ContractDraft?
 
   @@index([organizationId])
   @@map("local_rule_notes")
@@ -1057,6 +1073,75 @@ model AuditEvent {
 
   @@index([organizationId, createdAt])
   @@map("audit_events")
+}
+
+model ContractDocument {
+  id             String                 @id @default(cuid())
+  organizationId String                 @map("organization_id")
+  projectId      String                 @map("project_id")
+  documentId     String                 @map("document_id")
+  docType        String                 @map("doc_type")
+  title          String
+  parties        String
+  effectiveOn    DateTime?              @map("effective_on")
+  receivedOn     DateTime?              @map("received_on")
+  revisionLabel  String?                @map("revision_label")
+  notes          String?                @db.Text
+  createdById    String                 @map("created_by_id")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  document       SafetyDocument         @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  drafts         ContractDraft[]
+  impactReviews  ContractImpactReview[]
+
+  @@index([organizationId, projectId])
+  @@map("contract_documents")
+}
+
+model ContractDraft {
+  id                 String               @id @default(cuid())
+  organizationId     String               @map("organization_id")
+  projectId          String               @map("project_id")
+  contractDocumentId String               @map("contract_document_id")
+  clauseReference    String               @map("clause_reference")
+  quote              String               @db.Text
+  requirementId      String?              @map("requirement_id")
+  status             String               @default("DRAFT")
+  acceptReason       String?              @map("accept_reason") @db.Text
+  acceptedById       String?              @map("accepted_by_id")
+  acceptedAt         DateTime?            @map("accepted_at")
+  localRuleNoteId    String?              @unique @map("local_rule_note_id")
+  taskId             String?              @unique @map("task_id")
+  createdById        String               @map("created_by_id")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project            Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractDocument   ContractDocument     @relation(fields: [contractDocumentId], references: [id], onDelete: Cascade)
+  requirement        RegulatoryRequirement? @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  acceptedBy         User?                @relation("ContractAcceptedBy", fields: [acceptedById], references: [id], onDelete: Restrict)
+  localRuleNote      LocalRuleNote?       @relation(fields: [localRuleNoteId], references: [id], onDelete: Restrict)
+  task               ComplianceTask?      @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status])
+  @@map("contract_drafts")
+}
+
+model ContractImpactReview {
+  id                 String           @id @default(cuid())
+  organizationId     String           @map("organization_id")
+  projectId          String           @map("project_id")
+  contractDocumentId String           @map("contract_document_id")
+  note               String           @db.Text
+  reviewedById       String           @map("reviewed_by_id")
+  reviewedAt         DateTime         @default(now()) @map("reviewed_at")
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project            Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractDocument   ContractDocument @relation(fields: [contractDocumentId], references: [id], onDelete: Cascade)
+  reviewer           User             @relation(fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, projectId])
+  @@map("contract_impact_reviews")
 }
 
 model EvidencePacket {

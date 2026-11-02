@@ -74,6 +74,14 @@ Auth.js is self-hosted. There is no Clerk account and no OAuth provider in this 
 
 Apply `prisma/migrations` for Phase 5 after pull, then `npm run db:seed`. The seed adds one demonstration packet on the kitchen remodel that points at the existing tailgate meeting.
 
+## Phase 6 additions
+
+- Project contract documents can point at a company file already stored, or a new PDF or text file in the same 8 MB store. Types are RFP/RFQ, prime contract, subcontract, addendum, specifications excerpt, or other. Workers can read the list. Only admins and safety managers can add documents or drafts.
+- A contract requirement starts as a draft. A person types the clause reference and the quote. It can point at a catalog requirement or stay as free text. Accepting it requires a reason of at least 20 characters. Acceptance creates an open project task and either a project applicability of "contractually required" or a local note that stays pending qualified review. The shared catalog text is not changed. The task keeps the source file, the quote, and who accepted it.
+- Adding an addendum to a project that already has an accepted contract requirement shows a review-impact note. A person can record a dated note. That note does not rewrite the accepted quote.
+
+Apply the Phase 6 migration, then `npm run db:seed`. The seed adds one demonstration subcontract file and one unverified draft on the kitchen remodel. It does not accept the draft.
+
 ## Phase 2 additions
 
 - Company qualified-review notes for the partially read Title 8 entries. The note does not edit the catalog and is not a certification.

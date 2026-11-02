@@ -375,6 +375,42 @@ export const closeoutSchema = z.object({
   acknowledgedNotASignature: z.string().optional().or(z.literal("")),
 });
 
+export const contractDocumentSchema = z.object({
+  projectId: z.string().trim().min(1, "too_small"),
+  documentId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  docType: z.enum(["RFP_RFQ", "PRIME", "SUBCONTRACT", "ADDENDUM", "SPECS", "OTHER"]),
+  title: text(2, 160),
+  parties: text(2, 200),
+  effectiveOn: dateOnly,
+  receivedOn: dateOnly,
+  revisionLabel: optionalText(80),
+  notes: optionalText(4000),
+});
+
+export const contractDraftSchema = z.object({
+  contractDocumentId: z.string().trim().min(1, "too_small"),
+  clauseReference: text(2, 200),
+  quote: text(10, 4000),
+  requirementId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+});
+
+export const contractAcceptSchema = z.object({
+  draftId: z.string().trim().min(1, "too_small"),
+  reason: text(20, 2000),
+  dueOn: dateOnly,
+});
+
+export const contractTaskSchema = z.object({
+  taskId: z.string().trim().min(1, "too_small"),
+  status: z.enum(["OPEN", "DONE"]),
+  documentId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+});
+
+export const contractImpactSchema = z.object({
+  contractDocumentId: z.string().trim().min(1, "too_small"),
+  note: text(20, 2000),
+});
+
 export const packetSchema = z.object({
   projectId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
   title: text(2, 160),

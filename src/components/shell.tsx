@@ -23,6 +23,7 @@ const more = [
   ["/app/public-works", "nav.publicWorks"],
   ["/app/local-rules", "nav.localRules"],
   ["/app/packets", "nav.packets"],
+  ["/app/contracts", "nav.contracts"],
   ["/app/heat", "nav.heat"],
   ["/app/smoke", "nav.smoke"],
   ["/app/jurisdictions", "nav.cities"],

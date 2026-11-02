@@ -2,6 +2,9 @@ import { beforeEach, afterAll } from "vitest";
 import { prisma } from "../src/lib/db";
 
 const tables = [
+  "contract_impact_reviews",
+  "contract_drafts",
+  "contract_documents",
   "evidence_packet_items",
   "evidence_packets",
   "closeout_items",
