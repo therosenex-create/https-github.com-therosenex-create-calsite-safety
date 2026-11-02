@@ -28,7 +28,19 @@ export default async function MeetingDetail({ params }: { params: Promise<{ id: 
         <p className="text-sm text-muted">{formatPacific(locale, meeting.scheduledAt)} · {meeting.leaderName}</p>
         <p className="mt-2 text-sm">{t(locale, `enum.PolicyBasis.${meeting.policyBasis}`)}</p>
         {meeting.requirementCode ? <p className="text-sm">Code: {meeting.requirementCode}</p> : null}
-        <p className="note mt-3">{t(locale, "common.checkbox")}</p>
+        <p className="note mt-3">{meeting.meetingKind === "TAILGATE" ? t(locale, "tailgate.signatureHint") : t(locale, "common.checkbox")}</p>
+        {meeting.acknowledgments.length > 0 ? (
+          <section className="mt-4">
+            <h2 className="font-serif text-2xl text-navy">{t(locale, "tailgate.acknowledgments")}</h2>
+            <ul className="mt-2 space-y-1 text-sm">
+              {meeting.acknowledgments.map((row) => (
+                <li key={row.id}>
+                  {row.signerName} · {t(locale, `tailgate.role.${row.roleLabel}`)} · {formatPacific(locale, row.signedAt)} · {row.method}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <p className="mt-3"><Link className="underline" href={`/app/meetings/${meeting.id}/print`}>{t(locale, "actions.print")}</Link></p>
       </div>
       <section className="card">

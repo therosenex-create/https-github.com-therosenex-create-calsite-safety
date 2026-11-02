@@ -80,19 +80,24 @@ export function SelectField({
   name,
   defaultValue,
   hint,
+  required,
   children,
 }: {
   label: string;
   name: string;
   defaultValue?: string | null;
   hint?: string;
+  required?: boolean;
   children: ReactNode;
 }) {
   const id = `field-${name}`;
   return (
     <label className="block" htmlFor={id}>
-      <span className="label">{label}</span>
-      <select id={id} className="input" name={name} defaultValue={defaultValue ?? undefined}>
+      <span className="label">
+        {label}
+        {required ? " *" : ""}
+      </span>
+      <select id={id} className="input" name={name} defaultValue={defaultValue ?? undefined} required={required}>
         {children}
       </select>
       {hint ? <span className="hint">{hint}</span> : null}

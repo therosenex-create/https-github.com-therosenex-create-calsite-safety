@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { EnumOptions, SelectField, TextArea, TextField } from "@/components/fields";
+import { StatusPill } from "@/components/status-pill";
 import { isAppError } from "@/lib/errors";
 import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
 import { getProjectDashboard } from "@/lib/services/reporting";
-import { getProject, listEmployeeOptions } from "@/lib/services/work";
+import { getProject, listEmployeeOptions, projectTailgateStatus } from "@/lib/services/work";
 import { archiveProjectAction, assignCrewAction, removeCrewAction, updateProjectAction } from "@/server/actions";
-import { toDateInput } from "@/lib/time";
+import { formatDateOnly, toDateInput } from "@/lib/time";
 
 const owners = ["PRIVATE", "PUBLIC_AGENCY", "SCHOOL_OR_COLLEGE", "SPECIAL_DISTRICT", "HOMEOWNER", "UNKNOWN"] as const;
 const works = ["UNKNOWN", "POTENTIALLY_APPLICABLE", "NOT_APPLICABLE", "APPLICABLE", "PENDING_QUALIFIED_REVIEW"] as const;
@@ -21,15 +22,23 @@ export default async function ProjectDetail({ params }: { params: Promise<{ id: 
     if (isAppError(error) && error.code === "not_found") notFound();
     throw error;
   });
-  const people = actor.role === "WORKER" ? [] : await listEmployeeOptions(actor);
+  const [people, cadence, dashboard] = await Promise.all([
+    actor.role === "WORKER" ? Promise.resolve([]) : listEmployeeOptions(actor),
+    projectTailgateStatus(actor, project.id),
+    getProjectDashboard(actor, project.id),
+  ]);
   const canWrite = actor.role !== "WORKER";
-  const dashboard = await getProjectDashboard(actor, project.id);
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm text-muted"><Link href="/app/projects">{t(locale, "nav.projects")}</Link></p>
         <h1 className="font-serif text-3xl text-navy">{project.name}</h1>
         <p className="mt-1 text-sm">{project.streetAddress}, {project.city}, {project.county} County, {project.state}</p>
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+          <Link className="underline" href={`/app/tailgates?project=${project.id}`}>{t(locale, "tailgate.cadence")}</Link>
+          <span>{t(locale, "tailgate.last")}: {formatDateOnly(locale, cadence.lastAt)}</span>
+          <StatusPill tone={cadence.cadence === "ON_TIME" ? "ok" : "due"}>{t(locale, `enum.TailgateCadence.${cadence.cadence}`)}</StatusPill>
+        </p>
         <p className="mt-2 text-sm"><Link className="underline" href={`/app/contracts?project=${project.id}`}>{t(locale, "nav.contracts")}</Link></p>
         {!project.jurisdictionConfirmed ? <p className="note mt-3">{t(locale, "hints.jurisdiction")}</p> : null}
         <p className="mt-3 text-sm">{t(locale, `enum.PublicWorksStatus.${project.publicWorksStatus}`)}</p>

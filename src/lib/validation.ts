@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AppError } from "./errors";
+import { TAILGATE_TOPIC_CODES } from "./tailgate-topics";
 import { parseDateOnly, pacificLocalToUtc } from "./time";
 
 const text = (min: number, max: number) => z.string().trim().min(min, "too_small").max(max, "too_big");
@@ -446,6 +447,50 @@ export const catalogSearchSchema = z.object({
     ])
     .optional()
     .transform((value) => value || undefined),
+});
+
+const rosterNames = z.string().trim().max(4000, "too_big").transform((value, ctx) => {
+  const names = value
+    .split(/[,;\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (names.length < 1) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "too_small" });
+    return z.NEVER;
+  }
+  if (names.length > 60) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "too_big" });
+    return z.NEVER;
+  }
+  if (names.some((name) => name.length < 2 || name.length > 120)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "invalid" });
+    return z.NEVER;
+  }
+  return names;
+});
+
+export const tailgateSchema = z.object({
+  projectId: z.string().trim().min(1, "too_small"),
+  topicCode: z.enum(TAILGATE_TOPIC_CODES),
+  conductedOn: requiredDateOnly,
+  conductorName: text(2, 120),
+  signatureName: text(2, 120),
+  roster: rosterNames,
+  language: z.enum(["en", "es"]),
+});
+
+export const iippHeaderSchema = z.object({
+  title: z.string().trim().max(180, "too_big").default(""),
+  revisionLabel: z.string().trim().max(40, "too_big").default(""),
+  administratorName: optionalText(120),
+  administratorTitle: optionalText(120),
+  annualReviewOn: dateOnly,
+});
+
+export const iippSubmittalSchema = z.object({
+  projectId: z.string().trim().min(1, "too_small"),
+  companyName: text(2, 160),
+  note: optionalText(1000),
 });
 
 export const inviteSchema = z.object({

@@ -63,6 +63,15 @@ export function formatDateOnly(locale: "en" | "es", value: Date | null | undefin
   }).format(value);
 }
 
+export function pacificTodayInput(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
 export function formatPacific(locale: "en" | "es", value: Date | null | undefined): string {
   if (!value) return "—";
   return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {

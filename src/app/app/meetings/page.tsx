@@ -17,12 +17,15 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader title={t(locale, "nav.meetings")} subtitle={t(locale, "hints.policy")} />
+      <p className="mb-4 text-sm">
+        <Link className="font-semibold text-navy underline" href="/app/tailgates">{t(locale, "tailgate.log")} · § 1509</Link>
+      </p>
       <ul className="space-y-3">
         {result.items.length === 0 ? <li className="text-sm text-muted">{t(locale, "empty.meetings")}</li> : null}
         {result.items.map((meeting) => (
           <li key={meeting.id} className="card">
             <Link className="font-semibold text-navy underline" href={`/app/meetings/${meeting.id}`}>{meeting.title}</Link>
-            <p className="text-sm text-muted">{formatPacific(locale, meeting.scheduledAt)} · {meeting.project?.name ?? "—"} · {meeting._count.attendance}</p>
+            <p className="text-sm text-muted">{formatPacific(locale, meeting.scheduledAt)} · {meeting.project?.name ?? "—"} · {meeting._count.attendance}{meeting.meetingKind === "TAILGATE" ? ` · ${t(locale, "nav.tailgates")}` : ""}</p>
             <p className="text-sm">{t(locale, `enum.PolicyBasis.${meeting.policyBasis}`)}</p>
           </li>
         ))}
