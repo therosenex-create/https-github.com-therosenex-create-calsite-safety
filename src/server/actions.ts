@@ -50,7 +50,9 @@ import {
   updateTraining,
 } from "@/lib/services/work";
 import { assignRequirement, flagSourceForManualReview, linkEvidence, updateIipp } from "@/lib/services/regulatory";
+import { getMailer } from "@/lib/mailer";
 import { createCitySource, createPermit, recordQualifiedReview } from "@/lib/services/records";
+import { createHeatPlan, createPayrollDraft, createPublicWorksRecord, createSmokePlan } from "@/lib/services/field-ops";
 import { prisma } from "@/lib/db";
 import type { ActionState } from "@/components/action-form";
 
@@ -504,13 +506,21 @@ export async function licenseCheckAction(_prev: ActionState, formData: FormData)
 }
 
 export async function inviteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const locale = await getLocale();
   try {
-    await inviteMember(await getActor(), values(formData, ["name", "email", "password", "role"]));
+    const actor = await getActor();
+    const input = values(formData, ["name", "email", "password", "role"]);
+    await inviteMember(actor, input);
+    const mail = await getMailer().sendInvitation({
+      to: input.email,
+      companyName: actor.organizationName,
+      inviteeName: input.name,
+    });
+    revalidatePath("/app/settings");
+    return { notice: mail.delivered ? t(locale, "mail.sent") : t(locale, "mail.notSent") };
   } catch (error) {
     return fail(error);
   }
-  revalidatePath("/app/settings");
-  return {};
 }
 
 export async function roleAction(membershipId: string, formData: FormData) {
@@ -561,6 +571,46 @@ export async function permitAction(_prev: ActionState, formData: FormData): Prom
     return fail(error);
   }
   revalidatePath("/app/permits");
+  return {};
+}
+
+export async function heatPlanAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await createHeatPlan(await getActor(), values(formData, ["projectId", "waterProcedure", "shadeProcedure", "highHeatProcedure", "emergencyProcedure", "trainingNote"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/heat");
+  return {};
+}
+
+export async function smokePlanAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await createSmokePlan(await getActor(), values(formData, ["projectId", "manualCheckProcedure", "controlNote", "respiratorNote"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/smoke");
+  return {};
+}
+
+export async function publicWorksAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await createPublicWorksRecord(await getActor(), values(formData, ["projectId", "awardingBody", "registrationEvidenceNote", "registrationDocumentId", "wageDeterminationId", "wageNote", "apprenticeshipCraft", "apprenticeshipNote"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/public-works");
+  return {};
+}
+
+export async function payrollAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await createPayrollDraft(await getActor(), values(formData, ["projectId", "weekEnding", "note"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/public-works");
   return {};
 }
 

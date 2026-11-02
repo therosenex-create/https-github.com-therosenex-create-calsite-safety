@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 
-export type ActionState = { error?: string };
+export type ActionState = { error?: string; notice?: string };
 
 export function ActionForm({
   action,
@@ -26,6 +26,7 @@ export function ActionForm({
           {state.error}
         </p>
       ) : null}
+      {state.notice ? <p className="note">{state.notice}</p> : null}
       <button className={secondary ? "btn-secondary" : "btn"} type="submit" disabled={pending}>
         {submitLabel}
       </button>
