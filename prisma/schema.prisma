@@ -1,0 +1,818 @@
+// CalSite Safety data model.
+// Tenant records always carry organizationId. Regulatory catalog rows are shared
+// reference data and are not a legal determination.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  ADMIN
+  SAFETY_MANAGER
+  WORKER
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETE
+  ARCHIVED
+}
+
+enum OwnerType {
+  PRIVATE
+  PUBLIC_AGENCY
+  SCHOOL_OR_COLLEGE
+  SPECIAL_DISTRICT
+  HOMEOWNER
+  UNKNOWN
+}
+
+enum PublicWorksStatus {
+  UNKNOWN
+  POTENTIALLY_APPLICABLE
+  NOT_APPLICABLE
+  APPLICABLE
+  PENDING_QUALIFIED_REVIEW
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETE
+  ARCHIVED
+}
+
+enum PolicyBasis {
+  COMPANY_POLICY
+  CONTRACT_REQUIREMENT
+  RECORDED_AGAINST_CITATION
+}
+
+enum TrainingStatus {
+  RECORDED
+  ARCHIVED
+}
+
+enum InspectionStatus {
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+enum FindingStatus {
+  OPEN
+  CORRECTED
+  ARCHIVED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  IMMINENT_DANGER
+}
+
+enum ActionStatus {
+  OPEN
+  COMPLETE
+  ARCHIVED
+}
+
+enum IncidentType {
+  INJURY
+  ILLNESS
+  NEAR_MISS
+  PROPERTY_DAMAGE
+  EXPOSURE
+  OTHER
+}
+
+enum IncidentStatus {
+  OPEN
+  UNDER_REVIEW
+  CLOSED
+  ARCHIVED
+}
+
+enum VerificationStatus {
+  VERIFICATION_REQUIRED
+  LOOKUP_FAILED
+  MANUALLY_RECORDED
+  STALE
+  EXPIRED
+  SUSPENDED
+  INACTIVE
+  CANCELED
+}
+
+enum ApplicabilityState {
+  APPLICABLE
+  POTENTIALLY_APPLICABLE
+  NOT_APPLICABLE
+  CONTRACTUALLY_REQUIRED
+  RECOMMENDED_PRACTICE
+  PENDING_QUALIFIED_REVIEW
+  SUPERSEDED
+  VERIFICATION_OVERDUE
+}
+
+enum ReviewStatus {
+  UNREVIEWED
+  PENDING_QUALIFIED_REVIEW
+  SOURCE_LINKED
+  NEEDS_UPDATE
+  RETIRED
+}
+
+enum SourceReliability {
+  PRIMARY_STATUTE_OR_REGULATION
+  OFFICIAL_AGENCY_PUBLICATION
+  LOCAL_OFFICIAL_DOCUMENT
+  CONTRACT_DOCUMENT
+  SECONDARY_REFERENCE
+}
+
+enum DocumentKind {
+  BINDING_STATUTE
+  REGULATION
+  GUIDANCE
+  FORM
+  FAQ
+  MODEL_TEMPLATE
+  RECOMMENDATION
+  EXPLANATORY
+  HOMEPAGE
+  UNKNOWN
+}
+
+enum RetrievalStatus {
+  NOT_CONFIGURED
+  URL_REACHABLE
+  FETCHED_PARTIAL
+  BLOCKED
+  FAILED
+}
+
+enum EvidenceLinkStatus {
+  UPLOADED
+  REVIEWED
+  APPROVED
+  COMPLETED
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+  CANCELED
+}
+
+enum IippStatus {
+  TEMPLATE
+  IN_PROGRESS
+}
+
+enum TaskBasis {
+  USER_ENTERED
+  REQUIREMENT_UNVERIFIED
+}
+
+model Organization {
+  id                         String             @id @default(cuid())
+  name                       String
+  legalName                  String?            @map("legal_name")
+  dba                        String?
+  slug                       String             @unique
+  isDemonstration            Boolean            @default(false) @map("is_demonstration")
+  cslbLicenseNumber          String?            @map("cslb_license_number")
+  cslbClassification         String?            @map("cslb_classification")
+  cslbVerificationStatus     VerificationStatus @default(VERIFICATION_REQUIRED) @map("cslb_verification_status")
+  dirRegistrationNumber      String?            @map("dir_registration_number")
+  dirVerificationStatus      VerificationStatus @default(VERIFICATION_REQUIRED) @map("dir_verification_status")
+  mailingCity                String?            @map("mailing_city")
+  mailingState               String?            @map("mailing_state")
+  createdAt                  DateTime           @default(now()) @map("created_at")
+  updatedAt                  DateTime           @updatedAt @map("updated_at")
+  memberships                Membership[]
+  projects                   Project[]
+  employees                  Employee[]
+  meetings                   SafetyMeeting[]
+  trainings                  TrainingRecord[]
+  inspections                Inspection[]
+  incidents                  IncidentReport[]
+  documents                  SafetyDocument[]
+  iipp                       IippProgram?
+  companyRequirements        CompanyRequirement[]
+  projectRequirements        ProjectRequirement[]
+  evidenceLinks              ComplianceEvidenceLink[]
+  tasks                      ComplianceTask[]
+  auditEvents                AuditEvent[]
+  licenseChecks              LicenseCheck[]
+  correctiveActions          CorrectiveAction[]
+
+  @@map("organizations")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  passwordHash String       @map("password_hash")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  memberships  Membership[]
+  auditEvents  AuditEvent[]
+
+  @@map("users")
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String         @map("user_id")
+  organizationId String         @map("organization_id")
+  role           MembershipRole
+  createdAt      DateTime       @default(now()) @map("created_at")
+  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@map("memberships")
+}
+
+model Project {
+  id                     String             @id @default(cuid())
+  organizationId         String             @map("organization_id")
+  name                   String
+  jobsiteName            String?            @map("jobsite_name")
+  streetAddress          String             @map("street_address")
+  city                   String
+  county                 String
+  state                  String             @default("CA")
+  postalCode             String?            @map("postal_code")
+  jurisdictionConfirmed  Boolean            @default(false) @map("jurisdiction_confirmed")
+  ownerType              OwnerType          @default(UNKNOWN) @map("owner_type")
+  ownerName              String?            @map("owner_name")
+  publicWorksStatus      PublicWorksStatus  @default(UNKNOWN) @map("public_works_status")
+  publicWorksRationale   String?            @map("public_works_rationale") @db.Text
+  scopeOfWork            String?            @map("scope_of_work") @db.Text
+  description            String?            @db.Text
+  status                 ProjectStatus      @default(PLANNED)
+  startDate              DateTime?          @map("start_date")
+  endDate                DateTime?          @map("end_date")
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assignments            ProjectAssignment[]
+  meetings               SafetyMeeting[]
+  inspections            Inspection[]
+  incidents              IncidentReport[]
+  documents              SafetyDocument[]
+  trainings              TrainingRecord[]
+  requirements           ProjectRequirement[]
+  evidenceLinks          ComplianceEvidenceLink[]
+  tasks                  ComplianceTask[]
+
+  @@index([organizationId, status])
+  @@map("projects")
+}
+
+model Employee {
+  id                String         @id @default(cuid())
+  organizationId    String         @map("organization_id")
+  firstName         String         @map("first_name")
+  lastName          String         @map("last_name")
+  email             String?
+  phone             String?
+  jobTitle          String?        @map("job_title")
+  trade             String?
+  preferredLanguage String         @default("en") @map("preferred_language")
+  hireDate          DateTime?      @map("hire_date")
+  status            EmployeeStatus @default(ACTIVE)
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assignments       ProjectAssignment[]
+  attendance        MeetingAttendance[]
+  trainings         TrainingRecord[]
+
+  @@index([organizationId, status])
+  @@map("employees")
+}
+
+model ProjectAssignment {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  projectId      String       @map("project_id")
+  employeeId     String       @map("employee_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, employeeId])
+  @@index([organizationId])
+  @@map("project_assignments")
+}
+
+model SafetyMeeting {
+  id                String              @id @default(cuid())
+  organizationId    String              @map("organization_id")
+  projectId         String?             @map("project_id")
+  title             String
+  topic             String
+  language          String              @default("en")
+  scheduledAt       DateTime            @map("scheduled_at")
+  leaderName        String              @map("leader_name")
+  policyBasis       PolicyBasis         @default(COMPANY_POLICY) @map("policy_basis")
+  requirementCode   String?             @map("requirement_code")
+  discussionPoints  String?             @map("discussion_points") @db.Text
+  workerQuestions   String?             @map("worker_questions") @db.Text
+  followUp          String?             @map("follow_up") @db.Text
+  notes             String?             @db.Text
+  status            MeetingStatus       @default(SCHEDULED)
+  createdById       String              @map("created_by_id")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project           Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  attendance        MeetingAttendance[]
+  evidenceLinks     ComplianceEvidenceLink[]
+
+  @@index([organizationId, scheduledAt])
+  @@map("safety_meetings")
+}
+
+model MeetingAttendance {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  meetingId      String        @map("meeting_id")
+  employeeId     String        @map("employee_id")
+  present        Boolean       @default(true)
+  acknowledgedAt DateTime?     @map("acknowledged_at")
+  method         String        @default("onscreen_checkbox")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  meeting        SafetyMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  employee       Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, employeeId])
+  @@index([organizationId])
+  @@map("meeting_attendance")
+}
+
+model TrainingRecord {
+  id              String         @id @default(cuid())
+  organizationId  String         @map("organization_id")
+  employeeId      String         @map("employee_id")
+  projectId       String?        @map("project_id")
+  topic           String
+  provider        String?
+  completedOn     DateTime       @map("completed_on")
+  expiresOn       DateTime?      @map("expires_on")
+  evidenceNote    String?        @map("evidence_note") @db.Text
+  status          TrainingStatus @default(RECORDED)
+  createdById     String         @map("created_by_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  employee        Employee       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  evidenceLinks   ComplianceEvidenceLink[]
+
+  @@index([organizationId, completedOn])
+  @@map("training_records")
+}
+
+model Inspection {
+  id             String           @id @default(cuid())
+  organizationId String           @map("organization_id")
+  projectId      String           @map("project_id")
+  category       String
+  inspectedAt    DateTime         @map("inspected_at")
+  inspectorName  String           @map("inspector_name")
+  location       String?
+  summary        String           @db.Text
+  checklist      Json             @default("[]")
+  status         InspectionStatus @default(OPEN)
+  createdById    String           @map("created_by_id")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  findings       Finding[]
+  evidenceLinks  ComplianceEvidenceLink[]
+
+  @@index([organizationId, inspectedAt])
+  @@map("inspections")
+}
+
+model Finding {
+  id              String            @id @default(cuid())
+  organizationId  String            @map("organization_id")
+  inspectionId    String            @map("inspection_id")
+  description     String            @db.Text
+  severity        Severity          @default(MEDIUM)
+  immediateAction String?           @map("immediate_action") @db.Text
+  status          FindingStatus     @default(OPEN)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  inspection      Inspection        @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  correctiveActions CorrectiveAction[]
+
+  @@index([organizationId, status])
+  @@map("findings")
+}
+
+model CorrectiveAction {
+  id              String       @id @default(cuid())
+  organizationId  String       @map("organization_id")
+  findingId       String       @map("finding_id")
+  description     String       @db.Text
+  responsibleName String       @map("responsible_name")
+  dueDate         DateTime?    @map("due_date")
+  completedAt     DateTime?    @map("completed_at")
+  evidenceNote    String?      @map("evidence_note") @db.Text
+  status          ActionStatus @default(OPEN)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  finding         Finding      @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  tasks           ComplianceTask[]
+
+  @@index([organizationId, status])
+  @@map("corrective_actions")
+}
+
+model IncidentReport {
+  id                  String         @id @default(cuid())
+  organizationId      String         @map("organization_id")
+  projectId           String?        @map("project_id")
+  type                IncidentType
+  severity            Severity       @default(LOW)
+  occurredAt          DateTime       @map("occurred_at")
+  location            String?
+  description         String         @db.Text
+  immediateActions    String?        @map("immediate_actions") @db.Text
+  peopleInvolved      String?        @map("people_involved") @db.Text
+  investigationNotes  String?        @map("investigation_notes") @db.Text
+  status              IncidentStatus @default(OPEN)
+  createdById         String         @map("created_by_id")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+  organization        Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project             Project?       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  evidenceLinks       ComplianceEvidenceLink[]
+
+  @@index([organizationId, occurredAt])
+  @@map("incident_reports")
+}
+
+model SafetyDocument {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  projectId      String?      @map("project_id")
+  title          String
+  category       String
+  description    String?      @db.Text
+  fileName       String?      @map("file_name")
+  mimeType       String?      @map("mime_type")
+  byteSize       Int?         @map("byte_size")
+  sha256         String?
+  contentBytes   Bytes?       @map("content_bytes")
+  archived       Boolean      @default(false)
+  createdById    String       @map("created_by_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  evidenceLinks  ComplianceEvidenceLink[]
+
+  @@index([organizationId, archived])
+  @@map("safety_documents")
+}
+
+model IippProgram {
+  id                    String       @id @default(cuid())
+  organizationId        String       @unique @map("organization_id")
+  status                IippStatus   @default(TEMPLATE)
+  implementationClaim   String?      @map("implementation_claim") @db.Text
+  claimRecordedAt       DateTime?    @map("claim_recorded_at")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  elements              IippElement[]
+
+  @@map("iipp_programs")
+}
+
+model IippElement {
+  id              String      @id @default(cuid())
+  programId       String      @map("program_id")
+  sortOrder       Int         @map("sort_order")
+  key             String
+  citation        String
+  titleEn         String      @map("title_en")
+  titleEs         String      @map("title_es")
+  userProcedure   String?     @map("user_procedure") @db.Text
+  responsibleName String?     @map("responsible_name")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  program         IippProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, key])
+  @@map("iipp_elements")
+}
+
+model Agency {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  abbreviation String
+  websiteUrl  String   @map("website_url")
+  level       String
+  sources     RegulatorySource[]
+
+  @@map("agencies")
+}
+
+model Jurisdiction {
+  id       String  @id @default(cuid())
+  code     String  @unique
+  name     String
+  kind     String
+  state    String?
+  sources  RegulatorySource[]
+
+  @@map("jurisdictions")
+}
+
+model RegulatorySource {
+  id                            String            @id @default(cuid())
+  code                          String            @unique
+  agencyId                      String            @map("agency_id")
+  jurisdictionId                String            @map("jurisdiction_id")
+  title                         String
+  documentKind                  DocumentKind      @map("document_kind")
+  subject                       String
+  officialUrl                   String            @map("official_url")
+  versionLabel                  String            @map("version_label")
+  publicationDate               DateTime?         @map("publication_date")
+  effectiveDate                 DateTime?         @map("effective_date")
+  geographicArea                String            @map("geographic_area")
+  reliability                   SourceReliability
+  reviewStatus                  ReviewStatus      @map("review_status")
+  isBinding                     Boolean           @default(false) @map("is_binding")
+  limitations                   String            @db.Text
+  retrievalStatus               RetrievalStatus   @map("retrieval_status")
+  retrievedAt                   DateTime?         @map("retrieved_at")
+  automatedRetrievalConfigured  Boolean           @default(false) @map("automated_retrieval_configured")
+  contentFingerprint            String?           @map("content_fingerprint")
+  fingerprintScope              String?           @map("fingerprint_scope")
+  createdAt                     DateTime          @default(now()) @map("created_at")
+  updatedAt                     DateTime          @updatedAt @map("updated_at")
+  agency                        Agency            @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  jurisdiction                  Jurisdiction      @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  versions                      RegulatoryVersion[]
+  requirements                  RegulatoryRequirement[]
+  changes                       RegulatoryChange[]
+
+  @@map("regulatory_sources")
+}
+
+model RegulatoryVersion {
+  id                String           @id @default(cuid())
+  sourceId          String           @map("source_id")
+  versionLabel      String           @map("version_label")
+  retrievedAt       DateTime?        @map("retrieved_at")
+  fingerprint       String?
+  fingerprintScope  String           @map("fingerprint_scope")
+  notes             String           @db.Text
+  source            RegulatorySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@map("regulatory_versions")
+}
+
+model RegulatoryRequirement {
+  id                   String             @id @default(cuid())
+  code                 String             @unique
+  sourceId             String             @map("source_id")
+  title                String
+  citation             String
+  plainLanguageEn      String             @map("plain_language_en") @db.Text
+  plainLanguageEs      String             @map("plain_language_es") @db.Text
+  officialExcerpt      String?            @map("official_excerpt") @db.Text
+  excerptIsPartial     Boolean            @default(true) @map("excerpt_is_partial")
+  scope                String             @db.Text
+  industry             String
+  activity             String             @db.Text
+  geographicScope      String             @map("geographic_scope")
+  responsibleParty     String             @map("responsible_party")
+  deadlineOrTrigger    String             @map("deadline_or_trigger") @db.Text
+  deadlineVerified     Boolean            @default(false) @map("deadline_verified")
+  recurrence           String?
+  consequencesNote     String?            @map("consequences_note") @db.Text
+  reviewStatus         ReviewStatus       @map("review_status")
+  limitations          String             @db.Text
+  lastVerifiedAt       DateTime?          @map("last_verified_at")
+  defaultApplicability ApplicabilityState @map("default_applicability")
+  legalAuthority       String             @map("legal_authority")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  source               RegulatorySource   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  triggers             RequirementTrigger[]
+  exceptions           RequirementException[]
+  evidenceTypes        RequirementEvidenceType[]
+  applicabilityRules   RequirementApplicabilityRule[]
+  companyRequirements  CompanyRequirement[]
+  projectRequirements  ProjectRequirement[]
+  evidenceLinks        ComplianceEvidenceLink[]
+  tasks                ComplianceTask[]
+
+  @@index([reviewStatus])
+  @@map("regulatory_requirements")
+}
+
+model RequirementTrigger {
+  id             String                  @id @default(cuid())
+  requirementId  String                  @map("requirement_id")
+  description    String                  @db.Text
+  statedInSource Boolean                 @default(false) @map("stated_in_source")
+  requirement    RegulatoryRequirement   @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId])
+  @@map("requirement_triggers")
+}
+
+model RequirementException {
+  id            String                @id @default(cuid())
+  requirementId String                @map("requirement_id")
+  description   String                @db.Text
+  partial       Boolean               @default(true)
+  requirement   RegulatoryRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId])
+  @@map("requirement_exceptions")
+}
+
+model RequirementEvidenceType {
+  id             String                @id @default(cuid())
+  requirementId  String                @map("requirement_id")
+  name           String
+  description    String                @db.Text
+  statedInSource Boolean               @default(false) @map("stated_in_source")
+  requirement    RegulatoryRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId])
+  @@map("requirement_evidence_types")
+}
+
+model RequirementApplicabilityRule {
+  id            String                @id @default(cuid())
+  requirementId String                @map("requirement_id")
+  description   String                @db.Text
+  result        ApplicabilityState
+  requirement   RegulatoryRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@index([requirementId])
+  @@map("requirement_applicability_rules")
+}
+
+model RegulatoryChange {
+  id                       String           @id @default(cuid())
+  sourceId                 String           @map("source_id")
+  detectedAt               DateTime         @map("detected_at")
+  legalEffectiveDate       DateTime?        @map("legal_effective_date")
+  summary                  String           @db.Text
+  reviewStatus             ReviewStatus     @default(PENDING_QUALIFIED_REVIEW) @map("review_status")
+  retrievalPerformed       Boolean          @default(false) @map("retrieval_performed")
+  flaggedByUserId          String?          @map("flagged_by_user_id")
+  flaggedByOrganizationId  String?          @map("flagged_by_organization_id")
+  source                   RegulatorySource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, detectedAt])
+  @@map("regulatory_changes")
+}
+
+model CompanyRequirement {
+  id               String                @id @default(cuid())
+  organizationId   String                @map("organization_id")
+  requirementId    String                @map("requirement_id")
+  applicability    ApplicabilityState
+  rationale        String                @db.Text
+  responsibleRole  String?               @map("responsible_role")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requirement      RegulatoryRequirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, requirementId])
+  @@index([organizationId])
+  @@map("company_requirements")
+}
+
+model ProjectRequirement {
+  id               String                @id @default(cuid())
+  organizationId   String                @map("organization_id")
+  projectId        String                @map("project_id")
+  requirementId    String                @map("requirement_id")
+  applicability    ApplicabilityState
+  rationale        String                @db.Text
+  responsibleRole  String?               @map("responsible_role")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project          Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requirement      RegulatoryRequirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, requirementId])
+  @@index([organizationId])
+  @@map("project_requirements")
+}
+
+model ComplianceEvidenceLink {
+  id               String                @id @default(cuid())
+  organizationId   String                @map("organization_id")
+  requirementId    String                @map("requirement_id")
+  projectId        String?               @map("project_id")
+  documentId       String?               @map("document_id")
+  inspectionId     String?               @map("inspection_id")
+  meetingId        String?               @map("meeting_id")
+  trainingRecordId String?               @map("training_record_id")
+  incidentId       String?               @map("incident_id")
+  status           EvidenceLinkStatus    @default(UPLOADED)
+  note             String                @db.Text
+  createdById      String                @map("created_by_id")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requirement      RegulatoryRequirement @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  project          Project?              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  document         SafetyDocument?       @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  inspection       Inspection?           @relation(fields: [inspectionId], references: [id], onDelete: Restrict)
+  meeting          SafetyMeeting?        @relation(fields: [meetingId], references: [id], onDelete: Restrict)
+  trainingRecord   TrainingRecord?       @relation(fields: [trainingRecordId], references: [id], onDelete: Restrict)
+  incident         IncidentReport?       @relation(fields: [incidentId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, requirementId])
+  @@map("compliance_evidence_links")
+}
+
+model ComplianceTask {
+  id                String            @id @default(cuid())
+  organizationId    String            @map("organization_id")
+  projectId         String?           @map("project_id")
+  requirementId     String?           @map("requirement_id")
+  correctiveActionId String?          @map("corrective_action_id")
+  title             String
+  dueAt             DateTime?         @map("due_at")
+  basis             TaskBasis
+  basisNote         String            @map("basis_note") @db.Text
+  status            TaskStatus        @default(OPEN)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project           Project?          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  requirement       RegulatoryRequirement? @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  correctiveAction  CorrectiveAction? @relation(fields: [correctiveActionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("compliance_tasks")
+}
+
+model LicenseCheck {
+  id             String             @id @default(cuid())
+  organizationId String             @map("organization_id")
+  kind           String
+  status         VerificationStatus
+  note           String             @db.Text
+  checkedAt      DateTime           @map("checked_at")
+  recordedById   String             @map("recorded_by_id")
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, kind, checkedAt])
+  @@map("license_checks")
+}
+
+model AuditEvent {
+  id             String         @id @default(cuid())
+  organizationId String         @map("organization_id")
+  actorUserId    String         @map("actor_user_id")
+  actorRole      MembershipRole @map("actor_role")
+  action         String
+  entityType     String         @map("entity_type")
+  entityId       String         @map("entity_id")
+  metadata       Json           @default("{}")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor          User           @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@map("audit_events")
+}

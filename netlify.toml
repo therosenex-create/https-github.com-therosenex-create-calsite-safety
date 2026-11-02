@@ -1,0 +1,11 @@
+# CalSite Safety is a Next.js App Router app. Netlify detects Next.js and
+# configures the runtime. The database is external Postgres (DATABASE_URL).
+# Run `npx prisma migrate deploy` against that database before promoting a release.
+# Do not run the demonstration seed against production.
+
+[build]
+command = "npm run build"
+publish = ".next"
+
+[build.environment]
+NODE_VERSION = "22"
