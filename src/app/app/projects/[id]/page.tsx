@@ -5,6 +5,7 @@ import { EnumOptions, SelectField, TextArea, TextField } from "@/components/fiel
 import { isAppError } from "@/lib/errors";
 import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
+import { getProjectDashboard } from "@/lib/services/reporting";
 import { getProject, listEmployeeOptions } from "@/lib/services/work";
 import { archiveProjectAction, assignCrewAction, removeCrewAction, updateProjectAction } from "@/server/actions";
 import { toDateInput } from "@/lib/time";
@@ -22,6 +23,7 @@ export default async function ProjectDetail({ params }: { params: Promise<{ id: 
   });
   const people = actor.role === "WORKER" ? [] : await listEmployeeOptions(actor);
   const canWrite = actor.role !== "WORKER";
+  const dashboard = await getProjectDashboard(actor, project.id);
   return (
     <div className="space-y-6">
       <div>
@@ -32,6 +34,58 @@ export default async function ProjectDetail({ params }: { params: Promise<{ id: 
         <p className="mt-3 text-sm">{t(locale, `enum.PublicWorksStatus.${project.publicWorksStatus}`)}</p>
         {project.publicWorksRationale ? <p className="text-sm text-muted">{project.publicWorksRationale}</p> : null}
       </div>
+      <section className="card">
+        <h2 className="font-serif text-2xl">{t(locale, "dash.intro")}</h2>
+        <ul className="mt-4 space-y-4 text-sm">
+          <li>
+            <p className="font-semibold">{t(locale, "dash.actions")} · {dashboard.openCorrectiveActions.count}</p>
+            <ul className="mt-1 space-y-1">
+              {dashboard.openCorrectiveActions.items.map((item) => (
+                <li key={item.id}><Link className="underline" href={`/app/inspections/${item.inspectionId}`}>{item.description}</Link></li>
+              ))}
+            </ul>
+          </li>
+          <li>
+            <p className="font-semibold">{t(locale, "dash.incidents")} · {dashboard.openIncidents.count}</p>
+            <ul className="mt-1 space-y-1">
+              {dashboard.openIncidents.items.map((item) => (
+                <li key={item.id}><Link className="underline" href={`/app/incidents/${item.id}`}>{t(locale, `enum.IncidentType.${item.type}`)}</Link></li>
+              ))}
+            </ul>
+          </li>
+          <li>
+            <p className="font-semibold">{t(locale, "dash.training")} · {dashboard.trainingPointers.count}</p>
+            <ul className="mt-1 space-y-1">
+              {dashboard.trainingPointers.items.map((item) => (
+                <li key={item.id}><Link className="underline" href={`/app/training/${item.id}`}>{item.topic}</Link> · {t(locale, item.kind === "expired" ? "dash.expired" : "dash.expiring")}</li>
+              ))}
+            </ul>
+          </li>
+          <li>
+            <p className="font-semibold">{t(locale, "dash.permits")} · {dashboard.permits.count}</p>
+            <ul className="mt-1 space-y-1">
+              {dashboard.permits.items.map((item) => (
+                <li key={item.id}><Link className="underline" href="/app/permits">{item.permitType}</Link> · {t(locale, `enum.PermitRecordStatus.${item.status}`)}</li>
+              ))}
+            </ul>
+          </li>
+          <li>
+            <p className="font-semibold">{t(locale, "dash.closeout")} · {dashboard.closeoutIncomplete.count}</p>
+            <p><Link className="underline" href={`/app/public-works?project=${project.id}`}>{t(locale, "nav.publicWorks")}</Link></p>
+            <ul className="mt-1">
+              {dashboard.closeoutIncomplete.keys.map((key) => <li key={key}>{t(locale, `enum.Closeout.${key}`)}</li>)}
+            </ul>
+          </li>
+          <li>
+            <p className="font-semibold">{t(locale, "dash.pending")} · {dashboard.pendingApplicability.count}</p>
+            <ul className="mt-1 space-y-1">
+              {dashboard.pendingApplicability.items.map((item) => (
+                <li key={item.id}><Link className="underline" href={`/app/regulatory/requirements/${item.id}`}>{item.citation}</Link></li>
+              ))}
+            </ul>
+          </li>
+        </ul>
+      </section>
       <section className="card">
         <h2 className="font-serif text-2xl">{t(locale, "section.requirements")}</h2>
         <ul className="mt-3 space-y-2 text-sm">

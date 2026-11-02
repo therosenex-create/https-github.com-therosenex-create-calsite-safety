@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { PrintButton } from "@/components/print-button";
+import { PrintFooter } from "@/components/print-footer";
 import { isAppError } from "@/lib/errors";
 import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
@@ -14,7 +16,8 @@ export default async function MeetingPrint({ params }: { params: Promise<{ id: s
   });
   return (
     <article className="mx-auto max-w-3xl bg-white p-6">
-      <p className="text-sm font-semibold uppercase tracking-wide">{t(locale, "brand")}</p>
+      <PrintButton label={t(locale, "actions.print")} />
+      <p className="mt-4 text-sm font-semibold uppercase tracking-wide">{t(locale, "brand")}</p>
       <h1 className="mt-2 font-serif text-3xl">{meeting.title}</h1>
       <p className="mt-2 text-sm">{formatPacific(locale, meeting.scheduledAt)} · {meeting.leaderName}</p>
       <p className="text-sm">{meeting.project?.name}</p>
@@ -29,6 +32,7 @@ export default async function MeetingPrint({ params }: { params: Promise<{ id: s
           <li key={row.id}>{row.employee.firstName} {row.employee.lastName} · {row.method}</li>
         ))}
       </ul>
+      <PrintFooter locale={locale} demonstration={actor.isDemonstration} />
     </article>
   );
 }

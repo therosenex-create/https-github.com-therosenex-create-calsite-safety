@@ -34,6 +34,8 @@ export default async function PublicWorksPage({ searchParams }: { searchParams: 
           ))}
         </ul>
         {closeout ? (
+          <div>
+            <p className="mt-3 text-sm"><Link className="underline" href={`/app/public-works/print?project=${params.project}`}>{t(locale, "actions.print")}</Link></p>
           <ul className="mt-4 space-y-4">
             {closeout.map((item) => (
               <li key={item.key} className="rounded-md border border-line p-3 text-sm">
@@ -64,6 +66,7 @@ export default async function PublicWorksPage({ searchParams }: { searchParams: 
               </li>
             ))}
           </ul>
+          </div>
         ) : null}
       </section>
       <section className="card text-sm">

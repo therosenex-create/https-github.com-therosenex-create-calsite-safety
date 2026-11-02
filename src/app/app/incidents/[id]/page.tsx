@@ -24,6 +24,7 @@ export default async function IncidentDetail({ params }: { params: Promise<{ id:
     <div>
       <p className="text-sm"><Link href="/app/incidents">{t(locale, "nav.incidents")}</Link></p>
       <h1 className="font-serif text-3xl text-navy">{t(locale, `enum.IncidentType.${incident.type}`)}</h1>
+      <p className="mt-2 text-sm"><Link className="underline" href={`/app/incidents/${incident.id}/print`}>{t(locale, "actions.print")}</Link></p>
       <p className="text-sm text-muted">{formatPacific(locale, incident.occurredAt)}</p>
       {incident.severity === "IMMINENT_DANGER" ? <p className="alert mt-3">{t(locale, "emergency")}</p> : null}
       <div className="card mt-4">

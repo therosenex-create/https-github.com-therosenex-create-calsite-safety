@@ -52,6 +52,7 @@ import {
 import { assignRequirement, flagSourceForManualReview, linkEvidence, updateIipp } from "@/lib/services/regulatory";
 import { getMailer } from "@/lib/mailer";
 import { createLocalRule, saveCloseoutItem } from "@/lib/services/local";
+import { addPacketItem, createPacket } from "@/lib/services/packets";
 import { createCitySource, createPermit, recordQualifiedReview } from "@/lib/services/records";
 import { createHeatPlan, createPayrollDraft, createPublicWorksRecord, createSmokePlan } from "@/lib/services/field-ops";
 import { prisma } from "@/lib/db";
@@ -642,6 +643,26 @@ export async function closeoutAction(_prev: ActionState, formData: FormData): Pr
     return fail(error);
   }
   revalidatePath("/app/public-works");
+  return {};
+}
+
+export async function packetAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await createPacket(await getActor(), values(formData, ["projectId", "title", "purposeNote"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/packets");
+  return {};
+}
+
+export async function packetItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const item = await addPacketItem(await getActor(), values(formData, ["packetId", "kind", "recordId"]));
+    revalidatePath(`/app/packets/${item.packetId}`);
+  } catch (error) {
+    return fail(error);
+  }
   return {};
 }
 

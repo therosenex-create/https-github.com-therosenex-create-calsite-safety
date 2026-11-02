@@ -455,6 +455,29 @@ async function main() {
     },
   });
 
+  await prisma.evidencePacket.upsert({
+    where: { id: "demo-packet" },
+    update: {},
+    create: {
+      id: "demo-packet",
+      organizationId: organization.id,
+      projectId: remodel.id,
+      title: "Demonstration evidence packet",
+      purposeNote: "Demonstration organizational record. Not a filing and not a certification.",
+      createdById: admin.id,
+      items: {
+        create: {
+          id: "demo-packet-item",
+          organizationId: organization.id,
+          kind: "MEETING",
+          recordId: "demo-tailgate",
+          sortOrder: 1,
+          label: "Tailgate — drinking water and shade",
+        },
+      },
+    },
+  });
+
   console.log("Seeded catalog and Pacific Ridge Builders demonstration company.");
   console.log("Demo emails: demo.admin@calsite.example, demo.safety@calsite.example, demo.worker@calsite.example");
 }
