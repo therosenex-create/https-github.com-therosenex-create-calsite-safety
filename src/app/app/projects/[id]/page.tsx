@@ -30,6 +30,7 @@ export default async function ProjectDetail({ params }: { params: Promise<{ id: 
         <p className="text-sm text-muted"><Link href="/app/projects">{t(locale, "nav.projects")}</Link></p>
         <h1 className="font-serif text-3xl text-navy">{project.name}</h1>
         <p className="mt-1 text-sm">{project.streetAddress}, {project.city}, {project.county} County, {project.state}</p>
+        <p className="mt-2 text-sm"><Link className="underline" href={`/app/contracts?project=${project.id}`}>{t(locale, "nav.contracts")}</Link></p>
         {!project.jurisdictionConfirmed ? <p className="note mt-3">{t(locale, "hints.jurisdiction")}</p> : null}
         <p className="mt-3 text-sm">{t(locale, `enum.PublicWorksStatus.${project.publicWorksStatus}`)}</p>
         {project.publicWorksRationale ? <p className="text-sm text-muted">{project.publicWorksRationale}</p> : null}

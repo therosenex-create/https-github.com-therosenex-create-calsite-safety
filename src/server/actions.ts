@@ -51,6 +51,7 @@ import {
 } from "@/lib/services/work";
 import { assignRequirement, flagSourceForManualReview, linkEvidence, updateIipp } from "@/lib/services/regulatory";
 import { getMailer } from "@/lib/mailer";
+import { acceptContractDraft, createContractDocument, createContractDraft, recordAddendumReview, updateContractTask } from "@/lib/services/contracts";
 import { createLocalRule, saveCloseoutItem } from "@/lib/services/local";
 import { addPacketItem, createPacket } from "@/lib/services/packets";
 import { createCitySource, createPermit, recordQualifiedReview } from "@/lib/services/records";
@@ -643,6 +644,69 @@ export async function closeoutAction(_prev: ActionState, formData: FormData): Pr
     return fail(error);
   }
   revalidatePath("/app/public-works");
+  return {};
+}
+
+export async function contractDocumentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  let id = "";
+  try {
+    const file = formData.get("file");
+    let upload: { name: string; mimeType: string; bytes: Buffer } | null = null;
+    if (file instanceof File && file.size > 0) {
+      upload = { name: file.name, mimeType: file.type || "application/octet-stream", bytes: Buffer.from(await file.arrayBuffer()) };
+    }
+    const row = await createContractDocument(
+      await getActor(),
+      values(formData, ["projectId", "documentId", "docType", "title", "parties", "effectiveOn", "receivedOn", "revisionLabel", "notes"]),
+      upload,
+    );
+    id = row.id;
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/contracts");
+  redirect(`/app/contracts/${id}`);
+}
+
+export async function contractDraftAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  let documentId = "";
+  try {
+    const draft = await createContractDraft(await getActor(), values(formData, ["contractDocumentId", "clauseReference", "quote", "requirementId"]));
+    documentId = draft.contractDocumentId;
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath(`/app/contracts/${documentId}`);
+  return {};
+}
+
+export async function contractAcceptAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    const draft = await acceptContractDraft(await getActor(), values(formData, ["draftId", "reason", "dueOn"]));
+    revalidatePath(`/app/contracts/${draft.contractDocumentId}`);
+  } catch (error) {
+    return fail(error);
+  }
+  return {};
+}
+
+export async function contractTaskAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await updateContractTask(await getActor(), values(formData, ["taskId", "status", "documentId"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/contracts");
+  return {};
+}
+
+export async function contractImpactAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await recordAddendumReview(await getActor(), values(formData, ["contractDocumentId", "note"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/contracts");
   return {};
 }
 
