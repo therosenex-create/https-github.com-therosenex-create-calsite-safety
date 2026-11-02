@@ -1,8 +1,9 @@
+import type { ApplicabilityState, Prisma, ReviewStatus } from "@prisma/client";
 import type { Actor } from "../actor";
 import { assertCan } from "../authz";
 import { prisma } from "../db";
 import { AppError } from "../errors";
-import { applicabilitySchema, evidenceLinkSchema, parseInput } from "../validation";
+import { applicabilitySchema, catalogSearchSchema, evidenceLinkSchema, parseInput } from "../validation";
 import { audit } from "./common";
 
 export async function listSources(q?: string) {
@@ -52,6 +53,75 @@ export async function listRequirements(q?: string) {
     orderBy: { citation: "asc" },
     include: { source: { select: { officialUrl: true, documentKind: true, isBinding: true, reviewStatus: true } } },
   });
+}
+
+export function catalogGuidance(requirement: { citation: string; reviewStatus: string; limitations: string }) {
+  return {
+    en: `Stored catalog fields only. Citation: ${requirement.citation}. Review status: ${requirement.reviewStatus}. Limitations: ${requirement.limitations}`,
+    es: `Solo campos guardados del catálogo. Cita: ${requirement.citation}. Estado de revisión: ${requirement.reviewStatus}. Limitaciones: ${requirement.limitations}`,
+  };
+}
+
+export async function searchCatalog(actor: Actor, input: unknown) {
+  const filters = parseInput(catalogSearchSchema, input);
+  const and: Prisma.RegulatoryRequirementWhereInput[] = [];
+  const query = filters.q?.trim();
+  if (query) {
+    and.push({
+      OR: [
+        { citation: { contains: query, mode: "insensitive" } },
+        { title: { contains: query, mode: "insensitive" } },
+        { code: { contains: query, mode: "insensitive" } },
+        { plainLanguageEn: { contains: query, mode: "insensitive" } },
+        { plainLanguageEs: { contains: query, mode: "insensitive" } },
+        { limitations: { contains: query, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (filters.reviewStatus) and.push({ reviewStatus: filters.reviewStatus as ReviewStatus });
+  if (filters.jurisdiction) {
+    and.push({
+      OR: [
+        { source: { jurisdiction: { code: { equals: filters.jurisdiction, mode: "insensitive" } } } },
+        { source: { jurisdiction: { name: { contains: filters.jurisdiction, mode: "insensitive" } } } },
+        { geographicScope: { contains: filters.jurisdiction, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (filters.applicability) {
+    and.push({
+      companyRequirements: {
+        some: { organizationId: actor.organizationId, applicability: filters.applicability as ApplicabilityState },
+      },
+    });
+  }
+  const rows = await prisma.regulatoryRequirement.findMany({
+    where: and.length ? { AND: and } : undefined,
+    orderBy: { citation: "asc" },
+    take: 50,
+    include: {
+      source: { select: { officialUrl: true, jurisdiction: { select: { code: true, name: true } } } },
+      companyRequirements: { where: { organizationId: actor.organizationId }, take: 1 },
+    },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    citation: row.citation,
+    title: row.title,
+    code: row.code,
+    reviewStatus: row.reviewStatus,
+    limitations: row.limitations,
+    officialUrl: row.source.officialUrl,
+    jurisdictionCode: row.source.jurisdiction.code,
+    jurisdictionName: row.source.jurisdiction.name,
+    companyNote: row.companyRequirements[0]?.rationale ?? null,
+    companyApplicability: row.companyRequirements[0]?.applicability ?? null,
+    guidance: catalogGuidance(row),
+  }));
+}
+
+export async function listJurisdictions() {
+  return prisma.jurisdiction.findMany({ orderBy: { name: "asc" }, select: { code: true, name: true } });
 }
 
 export async function getRequirement(id: string) {

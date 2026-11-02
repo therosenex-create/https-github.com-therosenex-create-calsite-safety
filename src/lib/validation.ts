@@ -375,6 +375,43 @@ export const closeoutSchema = z.object({
   acknowledgedNotASignature: z.string().optional().or(z.literal("")),
 });
 
+export const packetSchema = z.object({
+  projectId: z.string().trim().optional().or(z.literal("")).transform((value) => value || null),
+  title: text(2, 160),
+  purposeNote: text(10, 2000),
+});
+
+export const packetItemSchema = z.object({
+  packetId: z.string().trim().min(1, "too_small"),
+  kind: z.enum(["MEETING", "INSPECTION", "INCIDENT", "PERMIT", "DOCUMENT", "PUBLIC_WORKS"]),
+  recordId: z.string().trim().min(1, "too_small"),
+});
+
+export const catalogSearchSchema = z.object({
+  q: z.string().trim().max(80).optional().or(z.literal("")),
+  reviewStatus: z
+    .union([z.enum(["UNREVIEWED", "PENDING_QUALIFIED_REVIEW", "SOURCE_LINKED", "NEEDS_UPDATE", "RETIRED"]), z.literal("")])
+    .optional()
+    .transform((value) => value || undefined),
+  jurisdiction: z.string().trim().max(80).optional().or(z.literal("")).transform((value) => value || undefined),
+  applicability: z
+    .union([
+      z.enum([
+        "APPLICABLE",
+        "POTENTIALLY_APPLICABLE",
+        "NOT_APPLICABLE",
+        "CONTRACTUALLY_REQUIRED",
+        "RECOMMENDED_PRACTICE",
+        "PENDING_QUALIFIED_REVIEW",
+        "SUPERSEDED",
+        "VERIFICATION_OVERDUE",
+      ]),
+      z.literal(""),
+    ])
+    .optional()
+    .transform((value) => value || undefined),
+});
+
 export const inviteSchema = z.object({
   name: text(2, 120),
   email: z.string().trim().email("invalid").max(200).transform((value) => value.toLowerCase()),

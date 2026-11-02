@@ -65,6 +65,15 @@ Auth.js is self-hosted. There is no Clerk account and no OAuth provider in this 
 - Local notes for amendments, fire approvals, environmental obligations, and right-of-way pointers. They stay pending review until a reason is recorded, and they do not enter the shared catalog.
 - Public-works closeout items stay incomplete until a dated note or file is saved. A typed name is stored only after the user confirms it is not a signature. Payroll drafts remain unsubmitted.
 
+## Phase 5 additions
+
+- Each project page lists open corrective actions, open incidents, training records whose stored expiration date is within 30 days, permit statuses, incomplete public-works closeout items, and applicability rows still pending review. The lists are counts and links. There is no compliance score and no pass or fail mark.
+- Evidence packets are company or project records with a title, a purpose note, and ordered links to meetings, inspections, incidents, permits, files, and public-works notes. The print view lists what is included and which kinds are still missing. A packet is an organizational record, not a filing or a certification.
+- Print views for a tailgate meeting, an inspection with findings and corrective actions, an incident, a closeout checklist, and an evidence packet. Each footer says whether the company is a demonstration account or an operational one, and that the page is not a Cal/OSHA filing. Workers still cannot open another worker's incident.
+- Catalog search filters by citation or keyword, jurisdiction tag, review status, and this company's applicability note. The guidance line only repeats the stored citation, review status, and limitations.
+
+Apply `prisma/migrations` for Phase 5 after pull, then `npm run db:seed`. The seed adds one demonstration packet on the kitchen remodel that points at the existing tailgate meeting.
+
 ## Phase 2 additions
 
 - Company qualified-review notes for the partially read Title 8 entries. The note does not edit the catalog and is not a certification.

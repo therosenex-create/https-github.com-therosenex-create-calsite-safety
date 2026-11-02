@@ -24,6 +24,7 @@ export default async function MeetingDetail({ params }: { params: Promise<{ id: 
       <div>
         <p className="text-sm"><Link href="/app/meetings">{t(locale, "nav.meetings")}</Link></p>
         <h1 className="font-serif text-3xl text-navy">{meeting.title}</h1>
+        <p className="mt-2 text-sm"><Link className="underline" href={`/app/meetings/${meeting.id}/print`}>{t(locale, "actions.print")}</Link></p>
         <p className="text-sm text-muted">{formatPacific(locale, meeting.scheduledAt)} · {meeting.leaderName}</p>
         <p className="mt-2 text-sm">{t(locale, `enum.PolicyBasis.${meeting.policyBasis}`)}</p>
         {meeting.requirementCode ? <p className="text-sm">Code: {meeting.requirementCode}</p> : null}

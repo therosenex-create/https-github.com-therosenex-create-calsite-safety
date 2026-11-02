@@ -39,6 +39,7 @@ export default async function InspectionDetail({ params }: { params: Promise<{ i
       <div>
         <p className="text-sm"><Link href="/app/inspections">{t(locale, "nav.inspections")}</Link></p>
         <h1 className="font-serif text-3xl text-navy">{t(locale, `enum.category.${inspection.category}`)}</h1>
+        <p className="mt-2 text-sm"><Link className="underline" href={`/app/inspections/${inspection.id}/print`}>{t(locale, "actions.print")}</Link></p>
         <p className="text-sm text-muted">{inspection.project.name} · {inspection.inspectorName}</p>
         {imminent ? <p className="alert mt-3">{t(locale, "emergency")}</p> : null}
         <p className="note mt-3">{t(locale, "common.guidance")}</p>
