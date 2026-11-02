@@ -188,6 +188,22 @@ enum TaskBasis {
   REQUIREMENT_UNVERIFIED
 }
 
+enum CompanyReviewDecision {
+  STILL_PENDING
+  SOURCE_READ_WITH_LIMITATIONS
+  NEEDS_ANOTHER_PASS
+}
+
+enum PermitRecordStatus {
+  NOT_STARTED
+  DRAFT
+  SUBMITTED
+  CORRECTIONS
+  USER_REPORTED_APPROVAL
+  CLOSED
+  UNKNOWN
+}
+
 model Organization {
   id                         String             @id @default(cuid())
   name                       String
@@ -220,6 +236,9 @@ model Organization {
   auditEvents                AuditEvent[]
   licenseChecks              LicenseCheck[]
   correctiveActions          CorrectiveAction[]
+  regulatoryReviews          RegulatoryReview[]
+  permitRecords              PermitRecord[]
+  citySources                CitySource[]
 
   @@map("organizations")
 }
@@ -228,11 +247,13 @@ model User {
   id           String       @id @default(cuid())
   email        String       @unique
   name         String
-  passwordHash String       @map("password_hash")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
-  memberships  Membership[]
-  auditEvents  AuditEvent[]
+  passwordHash   String       @map("password_hash")
+  sessionVersion Int          @default(0) @map("session_version")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  memberships    Membership[]
+  auditEvents    AuditEvent[]
+  regulatoryReviews RegulatoryReview[]
 
   @@map("users")
 }
@@ -283,6 +304,7 @@ model Project {
   requirements           ProjectRequirement[]
   evidenceLinks          ComplianceEvidenceLink[]
   tasks                  ComplianceTask[]
+  permitRecords          PermitRecord[]
 
   @@index([organizationId, status])
   @@map("projects")
@@ -496,6 +518,7 @@ model SafetyDocument {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   project        Project?     @relation(fields: [projectId], references: [id], onDelete: Restrict)
   evidenceLinks  ComplianceEvidenceLink[]
+  licenseChecks  LicenseCheck[]
 
   @@index([organizationId, archived])
   @@map("safety_documents")
@@ -637,6 +660,7 @@ model RegulatoryRequirement {
   projectRequirements  ProjectRequirement[]
   evidenceLinks        ComplianceEvidenceLink[]
   tasks                ComplianceTask[]
+  reviews              RegulatoryReview[]
 
   @@index([reviewStatus])
   @@map("regulatory_requirements")
@@ -794,10 +818,79 @@ model LicenseCheck {
   note           String             @db.Text
   checkedAt      DateTime           @map("checked_at")
   recordedById   String             @map("recorded_by_id")
+  documentId     String?            @map("document_id")
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  document       SafetyDocument?    @relation(fields: [documentId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, kind, checkedAt])
   @@map("license_checks")
+}
+
+model RegulatoryReview {
+  id                             String                  @id @default(cuid())
+  organizationId                 String                  @map("organization_id")
+  requirementId                  String                  @map("requirement_id")
+  reviewerUserId                 String                  @map("reviewer_user_id")
+  decision                       CompanyReviewDecision
+  note                           String                  @db.Text
+  reviewedAt                     DateTime                @default(now()) @map("reviewed_at")
+  acknowledgedNotCertification   Boolean                 @map("acknowledged_not_certification")
+  organization                   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requirement                    RegulatoryRequirement   @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  reviewer                       User                    @relation(fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, requirementId, reviewedAt])
+  @@map("regulatory_reviews")
+}
+
+model PermitRecord {
+  id                   String             @id @default(cuid())
+  organizationId       String             @map("organization_id")
+  projectId            String             @map("project_id")
+  authorityName        String             @map("authority_name")
+  jurisdictionLabel    String             @map("jurisdiction_label")
+  permitType           String             @map("permit_type")
+  permitNumber         String?            @map("permit_number")
+  status               PermitRecordStatus @default(UNKNOWN)
+  appliedOn            DateTime?          @map("applied_on")
+  notes                String?            @db.Text
+  officialUrl          String?            @map("official_url")
+  sourceReviewStatus   ReviewStatus       @default(UNREVIEWED) @map("source_review_status")
+  createdById          String             @map("created_by_id")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project              Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("permit_records")
+}
+
+model CitySource {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  cityName       String       @map("city_name")
+  countyName     String       @map("county_name")
+  subject        String
+  officialUrl    String?      @map("official_url")
+  notes          String       @db.Text
+  reviewStatus   ReviewStatus @default(UNREVIEWED) @map("review_status")
+  createdById    String       @map("created_by_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@map("city_sources")
+}
+
+model LoginAttempt {
+  id          String   @id @default(cuid())
+  email       String
+  success     Boolean
+  attemptedAt DateTime @default(now()) @map("attempted_at")
+
+  @@index([email, attemptedAt])
+  @@map("login_attempts")
 }
 
 model AuditEvent {

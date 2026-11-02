@@ -102,11 +102,11 @@ export const GUIDES: Guide[] = [
     },
     paragraphs: {
       en: [
-        "The catalog quotes the opening of §1670. The same section points roofing work to §1730 and other work to other safety orders. Those other sections were not extracted. §1730's URL was reachable and its text was not reviewed.",
+        "The catalog quotes the opening of §1670. Roofing section 1730 was read in part and uses different height language, including more than 20 feet for several slope cases. It is not the 7 1/2 foot sentence. Section 1731, which 1730 uses to exclude residential-type roofing, was not fetched.",
         "Do not enter a single company rule and label it as Title 8 for every task. Fall-protection plans and rescue plans that need a competent or qualified person are not generated here.",
       ],
       es: [
-        "El catálogo cita el inicio de §1670. La misma sección remite el trabajo de techado a §1730 y otro trabajo a otras órdenes de seguridad. Esas otras secciones no se extrajeron. La URL de §1730 respondió y su texto no se revisó.",
+        "El catálogo cita el inicio de §1670. La sección 1730 de techado se leyó en parte y usa otro lenguaje de altura, incluido más de 20 pies para varios casos de pendiente. No es la oración de 7 1/2 pies. No se obtuvo la sección 1731, que la 1730 usa para excluir el techado de tipo residencial.",
         "No ingrese una sola regla de la empresa y la etiquete como Título 8 para cada tarea. Aquí no se generan planes de protección contra caídas ni de rescate que exijan una persona competente o calificada.",
       ],
     },

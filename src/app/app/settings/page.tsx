@@ -4,7 +4,7 @@ import { EnumOptions, PageHeader, SelectField, TextArea, TextField } from "@/com
 import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
 import { getOrganization, listMembers } from "@/lib/services/accounts";
-import { inviteAction, licenseCheckAction, passwordAction, roleAction, updateOrgAction } from "@/server/actions";
+import { inviteAction, licenseCheckAction, passwordAction, revokeSelfAction, roleAction, updateOrgAction } from "@/server/actions";
 
 const checks = ["VERIFICATION_REQUIRED", "LOOKUP_FAILED", "MANUALLY_RECORDED", "STALE", "EXPIRED", "SUSPENDED", "INACTIVE", "CANCELED"] as const;
 
@@ -15,7 +15,11 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t(locale, "nav.settings")} />
-      <p className="text-sm"><Link className="underline" href="/app/audit">{t(locale, "nav.audit")}</Link></p>
+      <p className="text-sm">
+        <Link className="underline" href="/app/audit">{t(locale, "nav.audit")}</Link>
+        {" · "}
+        <Link className="underline" href="/app/licensing">{t(locale, "nav.licensing")}</Link>
+      </p>
       <section className="card">
         <h2 className="font-serif text-2xl">{t(locale, "section.account")}</h2>
         <p className="text-sm">{actor.name} · {actor.email} · {t(locale, `enum.MembershipRole.${actor.role}`)}</p>
@@ -25,6 +29,9 @@ export default async function SettingsPage() {
             <TextField label={t(locale, "fields.password")} name="password" type="password" required hint={t(locale, "hints.password")} />
             <TextField label={t(locale, "fields.confirmPassword")} name="confirmPassword" type="password" required />
           </ActionForm>
+          <form className="mt-4" action={revokeSelfAction}>
+            <button className="btn-secondary" type="submit">{t(locale, "actions.revoke")}</button>
+          </form>
         </div>
       </section>
       <section className="card">

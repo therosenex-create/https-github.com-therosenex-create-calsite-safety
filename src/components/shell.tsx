@@ -17,6 +17,10 @@ const more = [
   ["/app/documents", "nav.files"],
   ["/app/iipp", "nav.iipp"],
   ["/app/regulatory", "nav.requirements"],
+  ["/app/regulatory/reviews", "nav.reviews"],
+  ["/app/licensing", "nav.licensing"],
+  ["/app/permits", "nav.permits"],
+  ["/app/jurisdictions", "nav.cities"],
   ["/app/guidance", "nav.guidance"],
   ["/app/settings", "nav.settings"],
 ] as const;

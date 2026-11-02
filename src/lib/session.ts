@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import type { Actor } from "./actor";
 import { prisma } from "./db";
 import type { Locale } from "./i18n";
+import { sessionVersionMatches } from "./session-version";
 
 export const getLocale = cache(async (): Promise<Locale> => {
   const jar = await cookies();
@@ -23,6 +24,7 @@ export const getActor = cache(async (): Promise<Actor> => {
   const jar = await cookies();
   const preferred = jar.get("calsite_org")?.value;
   const membership = memberships.find((item) => item.organizationId === preferred) ?? memberships[0];
+  if (!sessionVersionMatches(session.user.sessionVersion, membership.user.sessionVersion)) redirect("/sign-in?revoked=1");
   return {
     userId: membership.userId,
     organizationId: membership.organizationId,
@@ -46,6 +48,7 @@ export async function getActorOrNull(): Promise<Actor | null> {
   const jar = await cookies();
   const preferred = jar.get("calsite_org")?.value;
   const membership = memberships.find((item) => item.organizationId === preferred) ?? memberships[0];
+  if (!sessionVersionMatches(session.user.sessionVersion, membership.user.sessionVersion)) return null;
   return {
     userId: membership.userId,
     organizationId: membership.organizationId,

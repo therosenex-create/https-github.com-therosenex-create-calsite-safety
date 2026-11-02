@@ -4,6 +4,7 @@ import { assertCan } from "../authz";
 import { prisma } from "../db";
 import { AppError } from "../errors";
 import { IIPP_ELEMENTS } from "../iipp-template";
+import { isLoginLimited, loginWindowStart } from "../rate-limit";
 import { hashPassword, verifyPassword } from "../password";
 import {
   inviteSchema,
@@ -69,14 +70,34 @@ export async function registerCompany(input: unknown) {
   }
 }
 
+async function recentFailures(email: string) {
+  return prisma.loginAttempt.count({
+    where: { email, success: false, attemptedAt: { gte: loginWindowStart() } },
+  });
+}
+
+export async function enforceLoginRateLimit(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return;
+  const failures = await recentFailures(normalized);
+  if (isLoginLimited(failures)) throw new AppError("rate_limited");
+}
+
+async function recordLoginAttempt(email: string, success: boolean) {
+  await prisma.loginAttempt.create({ data: { email, success } });
+}
+
 export async function authenticate(email: string, password: string) {
   const normalized = email.trim().toLowerCase();
+  await enforceLoginRateLimit(normalized);
   const user = await prisma.user.findUnique({ where: { email: normalized } });
   if (!user) {
     await hashPassword(password);
+    await recordLoginAttempt(normalized, false);
     return null;
   }
   const matches = await verifyPassword(password, user.passwordHash);
+  await recordLoginAttempt(normalized, matches);
   if (!matches) return null;
   return user;
 }
@@ -129,7 +150,7 @@ export async function changePassword(actor: Actor, input: unknown) {
   if (!matches) throw new AppError("current_password");
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: await hashPassword(data.password) },
+    data: { passwordHash: await hashPassword(data.password), sessionVersion: { increment: 1 } },
   });
   await audit(prisma, actor, "change_password", "User", user.id, {});
 }
@@ -143,9 +164,24 @@ export async function adminSetPassword(actor: Actor, userId: string, password: s
   if (!membership) throw new AppError("not_found");
   await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash: await hashPassword(parsed) },
+    data: { passwordHash: await hashPassword(parsed), sessionVersion: { increment: 1 } },
   });
   await audit(prisma, actor, "admin_set_password", "User", userId, {});
+}
+
+export async function revokeSessions(actor: Actor, userId: string) {
+  if (actor.userId !== userId) {
+    assertCan(actor, "manage_members");
+    const membership = await prisma.membership.findFirst({
+      where: { userId, organizationId: actor.organizationId },
+    });
+    if (!membership) throw new AppError("not_found");
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
+  });
+  await audit(prisma, actor, "revoke_sessions", "User", userId, {});
 }
 
 export async function updateOrganization(actor: Actor, input: unknown) {
@@ -182,6 +218,12 @@ export async function updateOrganization(actor: Actor, input: unknown) {
 export async function recordLicenseCheck(actor: Actor, input: unknown) {
   assertCan(actor, "manage_org");
   const data = parseInput(licenseCheckSchema, input);
+  if (data.documentId) {
+    const document = await prisma.safetyDocument.findFirst({
+      where: { id: data.documentId, organizationId: actor.organizationId },
+    });
+    if (!document) throw new AppError("not_found");
+  }
   return prisma.$transaction(async (tx) => {
     const check = await tx.licenseCheck.create({
       data: {
@@ -191,6 +233,7 @@ export async function recordLicenseCheck(actor: Actor, input: unknown) {
         note: data.note,
         checkedAt: new Date(),
         recordedById: actor.userId,
+        documentId: data.documentId,
       },
     });
     if (data.kind === "CSLB") {

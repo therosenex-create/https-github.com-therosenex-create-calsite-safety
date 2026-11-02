@@ -1,0 +1,17 @@
+/** Requirement codes whose DIR convenience copy was partially read. Company review is optional and is not a certification. */
+export const PARTIALLY_READ_CODES = [
+  "CCR-T8-3203",
+  "CCR-T8-1509-PROGRAM",
+  "CCR-T8-1509-CODE",
+  "CCR-T8-1509-TAILGATE",
+  "CCR-T8-3395",
+  "CCR-T8-3396",
+  "CCR-T8-1670",
+  "CCR-T8-1541",
+  "CCR-T8-1512",
+  "CCR-T8-1532-3",
+  "CCR-T8-1730",
+  "CCR-T8-1541-1",
+  "CCR-T8-5141-1",
+  "CCR-T8-1532-1",
+] as const;
