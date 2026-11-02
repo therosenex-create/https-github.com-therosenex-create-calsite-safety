@@ -40,8 +40,8 @@ Auth.js is self-hosted. There is no Clerk account and no OAuth provider in this 
 - Live CSLB, DIR, weather, or geocoding lookups
 - Agency filings, certified payroll, prevailing-wage calculations, or e-signatures that claim to be sworn
 - A numeric compliance score
-- City, county, fire-district, or school-district ordinances
-- Most of Title 8. Partial summaries now include §1730, §1541.1, §5141.1, and §1532.1. Asbestos, §1731, §1724, and §5144 are still unread
+- City, county, fire, water, school, or Caltrans ordinances. Contacts and notes stay empty until someone types them, and a city name does not load a rule
+- Most of Title 8. Partial summaries include the sections named in Phases 2 and 3. Sections 1724, 5144, 1716.2, 1671.1, and 1671.2 are still unread. Excavation appendix tables were not copied
 - Automated regulatory crawling. Change detection compares catalog text only when called in code and is not scheduled
 - Billing, live object-storage uploads, and invitation email. `getMailer()` records that nothing was sent
 - A distributed login rate limiter. Failed sign-ins are counted in Postgres for 15 minutes
@@ -57,6 +57,13 @@ Auth.js is self-hosted. There is no Clerk account and no OAuth provider in this 
 - Page CSP is set in middleware with a per-request script nonce and `strict-dynamic`. Styles still allow inline CSS.
 
 `npm audit` has no critical findings after moving to Auth.js 5.0.0-beta.32 and Vitest 5.1.0. Five high findings remain, and each published fix is a major upgrade (Prisma 7, Next.js 16, or Zod 4) that this release does not take. Those packages stay on the versions the app is tested against.
+
+## Phase 4 additions
+
+- Company agency contacts for city, county, fire, water, school district, and a Caltrans district note. They start empty. Saving a city name does not create an ordinance.
+- Permit records can store applied, issued, expiration, and closed dates plus a company file. Issued, company-reported approval, and closed statuses require a note or a file. Nothing is e-filed.
+- Local notes for amendments, fire approvals, environmental obligations, and right-of-way pointers. They stay pending review until a reason is recorded, and they do not enter the shared catalog.
+- Public-works closeout items stay incomplete until a dated note or file is saved. A typed name is stored only after the user confirms it is not a signature. Payroll drafts remain unsubmitted.
 
 ## Phase 2 additions
 

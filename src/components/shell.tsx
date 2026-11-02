@@ -21,6 +21,7 @@ const more = [
   ["/app/licensing", "nav.licensing"],
   ["/app/permits", "nav.permits"],
   ["/app/public-works", "nav.publicWorks"],
+  ["/app/local-rules", "nav.localRules"],
   ["/app/heat", "nav.heat"],
   ["/app/smoke", "nav.smoke"],
   ["/app/jurisdictions", "nav.cities"],

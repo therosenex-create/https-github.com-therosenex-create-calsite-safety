@@ -51,6 +51,7 @@ import {
 } from "@/lib/services/work";
 import { assignRequirement, flagSourceForManualReview, linkEvidence, updateIipp } from "@/lib/services/regulatory";
 import { getMailer } from "@/lib/mailer";
+import { createLocalRule, saveCloseoutItem } from "@/lib/services/local";
 import { createCitySource, createPermit, recordQualifiedReview } from "@/lib/services/records";
 import { createHeatPlan, createPayrollDraft, createPublicWorksRecord, createSmokePlan } from "@/lib/services/field-ops";
 import { prisma } from "@/lib/db";
@@ -566,7 +567,7 @@ export async function reviewAction(_prev: ActionState, formData: FormData): Prom
 
 export async function permitAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    await createPermit(await getActor(), values(formData, ["projectId", "authorityName", "jurisdictionLabel", "permitType", "permitNumber", "status", "appliedOn", "notes", "officialUrl"]));
+    await createPermit(await getActor(), values(formData, ["projectId", "authorityName", "jurisdictionLabel", "permitType", "permitNumber", "permitCategory", "status", "appliedOn", "issuedOn", "expiresOn", "closedOn", "notes", "officialUrl", "documentId"]));
   } catch (error) {
     return fail(error);
   }
@@ -616,11 +617,31 @@ export async function payrollAction(_prev: ActionState, formData: FormData): Pro
 
 export async function citySourceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    await createCitySource(await getActor(), values(formData, ["cityName", "countyName", "subject", "officialUrl", "notes"]));
+    await createCitySource(await getActor(), values(formData, ["cityName", "countyName", "subject", "officialUrl", "notes", "agencyKind", "contactName", "contactPhone", "contactEmail", "caltransDistrictNote"]));
   } catch (error) {
     return fail(error);
   }
   revalidatePath("/app/jurisdictions");
+  return {};
+}
+
+export async function localRuleAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await createLocalRule(await getActor(), values(formData, ["projectId", "requirementId", "topic", "ruleText", "citationUrl", "rationale", "reviewStatus", "documentId"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/local-rules");
+  return {};
+}
+
+export async function closeoutAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await saveCloseoutItem(await getActor(), values(formData, ["projectId", "itemKey", "note", "documentId", "signoffName", "acknowledgedNotASignature"]));
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/app/public-works");
   return {};
 }
 

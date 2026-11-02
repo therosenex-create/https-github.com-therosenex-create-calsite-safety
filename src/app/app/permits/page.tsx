@@ -3,22 +3,26 @@ import { ActionForm } from "@/components/action-form";
 import { EnumOptions, PageHeader, SelectField, TextArea, TextField } from "@/components/fields";
 import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
+import { permitGaps } from "@/lib/permit-gaps";
 import { listPermits } from "@/lib/services/records";
-import { listProjectOptions } from "@/lib/services/work";
+import { listDocuments, listProjectOptions } from "@/lib/services/work";
 import { formatDateOnly } from "@/lib/time";
 import { permitAction } from "@/server/actions";
 
-const statuses = ["UNKNOWN", "NOT_STARTED", "DRAFT", "SUBMITTED", "CORRECTIONS", "USER_REPORTED_APPROVAL", "CLOSED"] as const;
+const statuses = ["UNKNOWN", "NOT_STARTED", "DRAFT", "SUBMITTED", "CORRECTIONS", "USER_REPORTED_APPROVAL", "ISSUED", "CLOSED"] as const;
+const categories = ["custom", "building", "demolition", "electrical", "mechanical", "plumbing", "grading", "excavation", "encroachment", "fire", "other"] as const;
 
 export default async function PermitsPage() {
   const [actor, locale] = await Promise.all([getActor(), getLocale()]);
-  const [permits, projects] = await Promise.all([
+  const [permits, projects, documents] = await Promise.all([
     listPermits(actor),
     actor.role === "WORKER" ? Promise.resolve([]) : listProjectOptions(actor),
+    actor.role === "WORKER" ? Promise.resolve(null) : listDocuments(actor),
   ]);
   return (
     <div>
       <PageHeader title={t(locale, "nav.permits")} subtitle={t(locale, "permit.notRequired")} />
+      <p className="note mb-4">{t(locale, "permit.evidence")}</p>
       <ul className="space-y-3">
         {permits.length === 0 ? <li className="text-sm text-muted">{t(locale, "permit.empty")}</li> : null}
         {permits.map((permit) => (
@@ -28,6 +32,9 @@ export default async function PermitsPage() {
             <p>{t(locale, `enum.ReviewStatus.${permit.sourceReviewStatus}`)}</p>
             {permit.officialUrl ? <p><a className="underline" href={permit.officialUrl}>{permit.officialUrl}</a></p> : <p className="text-muted">{t(locale, "city.noExtract")}</p>}
             {permit.appliedOn ? <p>{formatDateOnly(locale, permit.appliedOn)}</p> : null}
+            {permitGaps(permit).length ? (
+              <p className="mt-2 text-muted">{t(locale, "permit.gaps")}: {permitGaps(permit).map((gap) => t(locale, `gap.${gap}`)).join(", ")}</p>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -41,14 +48,24 @@ export default async function PermitsPage() {
               </SelectField>
               <TextField label={t(locale, "fields.authority")} name="authorityName" required />
               <TextField label={t(locale, "fields.jurisdictionLabel")} name="jurisdictionLabel" required />
+              <SelectField label={t(locale, "fields.category")} name="permitCategory" defaultValue="custom">
+                {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </SelectField>
               <TextField label={t(locale, "fields.permitType")} name="permitType" required />
               <TextField label={t(locale, "fields.permitNumber")} name="permitNumber" />
               <SelectField label={t(locale, "fields.status")} name="status" defaultValue="UNKNOWN">
                 <EnumOptions locale={locale} group="PermitRecordStatus" values={statuses} />
               </SelectField>
               <TextField label={t(locale, "fields.startDate")} name="appliedOn" type="date" />
+              <TextField label={t(locale, "fields.issuedOn")} name="issuedOn" type="date" />
+              <TextField label={t(locale, "fields.expiresOn")} name="expiresOn" type="date" />
+              <TextField label={t(locale, "fields.closedOn")} name="closedOn" type="date" />
               <TextField label={t(locale, "fields.officialUrl")} name="officialUrl" hint={t(locale, "city.noExtract")} />
-              <TextArea label={t(locale, "fields.notes")} name="notes" />
+              <SelectField label={t(locale, "fields.file")} name="documentId">
+                <option value="">—</option>
+                {documents?.items.map((document) => <option key={document.id} value={document.id}>{document.title}</option>)}
+              </SelectField>
+              <TextArea label={t(locale, "fields.notes")} name="notes" hint={t(locale, "permit.evidence")} />
             </ActionForm>
           </div>
         </details>

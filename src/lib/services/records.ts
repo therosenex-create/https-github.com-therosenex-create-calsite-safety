@@ -3,6 +3,7 @@ import { assertCan } from "../authz";
 import { prisma } from "../db";
 import { AppError } from "../errors";
 import { PARTIALLY_READ_CODES } from "../review-queue";
+import { permitNeedsEvidence } from "../permit-gaps";
 import { citySourceSchema, parseInput, permitSchema, reviewSchema } from "../validation";
 import { audit } from "./common";
 
@@ -59,6 +60,16 @@ export async function createPermit(actor: Actor, input: unknown) {
     where: { id: data.projectId, organizationId: actor.organizationId },
   });
   if (!project) throw new AppError("not_found");
+  if (data.documentId) {
+    const document = await prisma.safetyDocument.findFirst({
+      where: { id: data.documentId, organizationId: actor.organizationId },
+    });
+    if (!document) throw new AppError("not_found");
+  }
+  if (permitNeedsEvidence(data.status)) {
+    const noteOk = (data.notes ?? "").trim().length >= 10;
+    if (!noteOk && !data.documentId) throw new AppError("evidence_required");
+  }
   const permit = await prisma.permitRecord.create({
     data: {
       organizationId: actor.organizationId,
@@ -67,15 +78,28 @@ export async function createPermit(actor: Actor, input: unknown) {
       jurisdictionLabel: data.jurisdictionLabel,
       permitType: data.permitType,
       permitNumber: data.permitNumber,
+      permitCategory: data.permitCategory ?? "custom",
       status: data.status,
       appliedOn: data.appliedOn,
+      issuedOn: data.issuedOn,
+      expiresOn: data.expiresOn,
+      closedOn: data.closedOn,
       notes: data.notes,
       officialUrl: data.officialUrl,
+      documentId: data.documentId,
       sourceReviewStatus: "UNREVIEWED",
       createdById: actor.userId,
     },
   });
   await audit(prisma, actor, "create_permit", "PermitRecord", permit.id, { status: permit.status });
+  return permit;
+}
+
+export async function getPermit(actor: Actor, id: string) {
+  const permit = await prisma.permitRecord.findFirst({
+    where: { id, organizationId: actor.organizationId },
+  });
+  if (!permit) throw new AppError("not_found");
   return permit;
 }
 
@@ -100,6 +124,11 @@ export async function createCitySource(actor: Actor, input: unknown) {
       subject: data.subject,
       officialUrl: data.officialUrl,
       notes: data.notes,
+      agencyKind: data.agencyKind ?? "CITY",
+      contactName: data.contactName,
+      contactPhone: data.contactPhone,
+      contactEmail: data.contactEmail,
+      caltransDistrictNote: data.caltransDistrictNote,
       reviewStatus: "UNREVIEWED",
       createdById: actor.userId,
     },
