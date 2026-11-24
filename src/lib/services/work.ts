@@ -398,14 +398,14 @@ export async function updateMeeting(actor: Actor, id: string, input: unknown) {
   const meeting = await prisma.safetyMeeting.update({
     where: { id },
     data: {
-      projectId: data.projectId,
+      projectId: existing.crewSign ? existing.projectId : data.projectId,
       title: existing.crewSign ? existing.title : data.title,
       topic: existing.crewSign ? existing.topic : data.topic,
       language: existing.crewSign ? existing.language : data.language,
       scheduledAt: existing.crewSign ? existing.scheduledAt : data.scheduledAt,
-      leaderName: data.leaderName,
+      leaderName: existing.crewSign ? existing.leaderName : data.leaderName,
       policyBasis: data.policyBasis,
-      requirementCode: data.requirementCode,
+      requirementCode: existing.crewSign ? existing.requirementCode : data.requirementCode,
       discussionPoints: existing.crewSign ? existing.discussionPoints : data.discussionPoints,
       workerQuestions: data.workerQuestions,
       followUp: data.followUp,

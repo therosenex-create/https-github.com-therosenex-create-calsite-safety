@@ -7,6 +7,7 @@ import { t } from "../src/lib/i18n";
 import { verifyChain, type ChainEvent } from "../src/lib/sign/chain";
 import { KIOSK_SCREEN_KEYS } from "../src/lib/sign/copy";
 import { tailgateAttestation } from "../src/lib/sign/format";
+import { buildSignedPdf } from "../src/lib/sign/pdf";
 import {
   createSignRequest,
   enrollSigner,
@@ -245,7 +246,7 @@ describe("crew sign", () => {
     expect(events.every((event) => event.signerName === "Ada Admin")).toBe(true);
   });
 
-  it("has English and Spanish copy for every kiosk screen", () => {
+  it("has English and Spanish copy for every kiosk screen", async () => {
     for (const key of KIOSK_SCREEN_KEYS) {
       const english = t("en", key);
       const spanish = t("es", key);
@@ -255,5 +256,20 @@ describe("crew sign", () => {
     }
     expect(tailgateAttestation("en", "2026-11-24")).toBe("I attended this meeting on 2026-11-24 and understood the topics.");
     expect(tailgateAttestation("es", "2026-11-24")).not.toBe(tailgateAttestation("en", "2026-11-24"));
+    const png = Buffer.from(PNG.split(",")[1] ?? "", "base64");
+    const pdf = Buffer.from(
+      await buildSignedPdf({
+        title: "Consentimiento",
+        lines: ["Versión electrónica"],
+        sections: [{ heading: "Consentimiento", body: "Esta firma electrónica es mi propio acto." }],
+        signatures: [{ name: "José Núñez", role: "worker", png, signedAt: new Date("2026-11-24T20:00:00.000Z"), late: false, flagged: false, method: "pin+drawn" }],
+        audits: [],
+        footer: "rev 1",
+      }),
+    );
+    const text = pdfText(pdf);
+    expect(text).toContain("Versión electrónica");
+    expect(text).toContain("José Núñez");
+    expect(text).toContain("electrónica");
   });
 });

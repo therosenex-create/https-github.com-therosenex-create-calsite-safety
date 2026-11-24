@@ -47,6 +47,17 @@ function pdfSafe(value: string) {
     .replaceAll("§", "Sec.");
 }
 
+/** Helvetica uses WinAnsi, which includes Spanish accents. Characters outside that set become "?". */
+function winAnsi(value: string) {
+  let out = "";
+  for (const ch of pdfSafe(value)) {
+    const code = ch.codePointAt(0) ?? 0;
+    if ((code >= 0x20 && code <= 0x7e) || (code >= 0xa1 && code <= 0xff)) out += ch;
+    else out += "?";
+  }
+  return out;
+}
+
 export async function buildSignedPdf(input: SignedPdfInput) {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -57,7 +68,7 @@ export async function buildSignedPdf(input: SignedPdfInput) {
   }
   const cursor = { page: doc.addPage([612, 792]), y: 750 };
   const draw = (text: string, size: number, face: PDFFont = font) => {
-    const line = pdfSafe(text).slice(0, 500);
+    const line = winAnsi(text).slice(0, 500);
     const width = 516;
     const words = line.split(/\s+/);
     let current = "";
@@ -75,7 +86,7 @@ export async function buildSignedPdf(input: SignedPdfInput) {
     if (lines.length === 0) lines.push("");
     for (const row of lines) {
       if (cursor.y < 64) cursor.page = addPage(doc, cursor);
-      const printable = row.replace(/[^\x20-\x7E]/g, "?");
+      const printable = row;
       cursor.page.drawText(printable, { x: 48, y: cursor.y, size, font: face, color: rgb(0.08, 0.12, 0.2) });
       cursor.y -= size + 4;
     }
@@ -135,7 +146,7 @@ function addPage(doc: PDFDocument, cursor: { y: number }) {
 }
 
 function stampFooter(page: PDFPage, font: PDFFont, footer: string) {
-  const text = pdfSafe(footer).replace(/[^\x20-\x7E]/g, "?");
+  const text = winAnsi(footer);
   page.drawText(text.slice(0, 95), { x: 48, y: 36, size: 8, font, color: rgb(0.25, 0.28, 0.33) });
   if (text.length > 95) {
     page.drawText(text.slice(95, 190), { x: 48, y: 24, size: 8, font, color: rgb(0.25, 0.28, 0.33) });
@@ -143,7 +154,7 @@ function stampFooter(page: PDFPage, font: PDFFont, footer: string) {
 }
 
 function drawAt(page: PDFPage, font: PDFFont, text: string, x: number, y: number, size: number) {
-  page.drawText(pdfSafe(text).replace(/[^\x20-\x7E]/g, "?").slice(0, 90), {
+  page.drawText(winAnsi(text).slice(0, 110), {
     x,
     y,
     size,
@@ -160,7 +171,7 @@ export async function buildPosterPdf(input: { projectName: string; projectCode: 
   const qr = await doc.embedPng(input.qrPng);
   page.drawText("CalSite Safety", { x: 48, y: 740, size: 14, font, color: rgb(0.08, 0.12, 0.2) });
   page.drawText("Crew Sign kiosk", { x: 48, y: 710, size: 22, font: bold, color: rgb(0.08, 0.12, 0.2) });
-  page.drawText(pdfSafe(input.projectName).replace(/[^\x20-\x7E]/g, "?").slice(0, 60), {
+  page.drawText(winAnsi(input.projectName).slice(0, 60), {
     x: 48,
     y: 678,
     size: 14,

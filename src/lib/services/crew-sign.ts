@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "crypto";
 import { hash, compare } from "bcryptjs";
-import type { Prisma, SignableType } from "@prisma/client";
+import { Prisma, type SignableType } from "@prisma/client";
 import type { Actor } from "../actor";
 import { assertCan } from "../authz";
 import { prisma } from "../db";
@@ -111,39 +111,55 @@ async function verifyPin(employeeId: string, pin: string, tokenHash: string, ip:
     await recordAttempt(tokenHash, ip, false);
     throw new AppError("invalid_pin");
   }
-  const credential = await prisma.signerCredential.findUnique({ where: { employeeId } });
   dummyPinHash ??= await hash("000000", PIN_ROUNDS);
-  if (!credential) {
-    await compare(pin, dummyPinHash);
-    await recordAttempt(tokenHash, ip, false);
-    throw new AppError("not_enrolled");
-  }
-  const locked = Boolean(credential.lockedUntil && credential.lockedUntil.getTime() > Date.now());
-  const match = await compare(pin, credential.pinHash);
-  if (credential.revokedAt || locked || !match) {
-    if (!credential.revokedAt && !locked) {
-      const failedAttempts = credential.failedAttempts + 1;
-      await prisma.signerCredential.update({
-        where: { id: credential.id },
-        data: {
-          failedAttempts,
-          lockedUntil: failedAttempts >= PIN_LIMIT ? new Date(Date.now() + PIN_LOCK_MS) : null,
-        },
-      });
-      await recordAttempt(tokenHash, ip, false);
-      throw new AppError(failedAttempts >= PIN_LIMIT ? "pin_locked" : "pin_invalid");
+  const outcome = await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{
+      id: string;
+      pin_hash: string;
+      revoked_at: Date | null;
+      locked_until: Date | null;
+      failed_attempts: number;
+    }>>`
+      SELECT id, pin_hash, revoked_at, locked_until, failed_attempts
+      FROM signer_credentials
+      WHERE employee_id = ${employeeId}
+      FOR UPDATE
+    `;
+    const credential = rows[0];
+    if (!credential) {
+      await compare(pin, dummyPinHash!);
+      return { code: "not_enrolled" as const };
     }
+    const locked = Boolean(credential.locked_until && new Date(credential.locked_until).getTime() > Date.now());
+    const match = await compare(pin, credential.pin_hash);
+    if (credential.revoked_at || locked || !match) {
+      if (!credential.revoked_at && !locked) {
+        const failedAttempts = credential.failed_attempts + 1;
+        await tx.signerCredential.update({
+          where: { id: credential.id },
+          data: {
+            failedAttempts,
+            lockedUntil: failedAttempts >= PIN_LIMIT ? new Date(Date.now() + PIN_LOCK_MS) : null,
+          },
+        });
+        return { code: failedAttempts >= PIN_LIMIT ? ("pin_locked" as const) : ("pin_invalid" as const) };
+      }
+      return { code: credential.revoked_at ? ("pin_revoked" as const) : ("pin_locked" as const) };
+    }
+    if (credential.failed_attempts || credential.locked_until) {
+      await tx.signerCredential.update({
+        where: { id: credential.id },
+        data: { failedAttempts: 0, lockedUntil: null },
+      });
+    }
+    return { code: "ok" as const, id: credential.id };
+  });
+  if (outcome.code !== "ok") {
     await recordAttempt(tokenHash, ip, false);
-    throw new AppError(credential.revokedAt ? "pin_revoked" : "pin_locked");
-  }
-  if (credential.failedAttempts || credential.lockedUntil) {
-    await prisma.signerCredential.update({
-      where: { id: credential.id },
-      data: { failedAttempts: 0, lockedUntil: null },
-    });
+    throw new AppError(outcome.code);
   }
   await recordAttempt(tokenHash, ip, true);
-  return credential;
+  return prisma.signerCredential.findUniqueOrThrow({ where: { id: outcome.id } });
 }
 
 async function appendEvent(tx: Tx, input: NewEvent) {
@@ -267,7 +283,14 @@ async function storePdf(input: {
   const digest = sha256(bytes);
   const fileName = signedFileName(input.projectCode, input.formCode, input.recordType, meetingDate(input.recordDate), input.revision);
   const existing = await prisma.signedRecordPdf.findUnique({
-    where: { recordType_recordId_revision: { recordType: input.recordType, recordId: input.recordId, revision: input.revision } },
+    where: {
+      organizationId_recordType_recordId_revision: {
+        organizationId: input.organizationId,
+        recordType: input.recordType,
+        recordId: input.recordId,
+        revision: input.revision,
+      },
+    },
   });
   if (existing?.exportedAt) return existing;
   if (existing && input.replaceIfUnexported) {
@@ -412,6 +435,12 @@ export async function enrollSigner(actor: Actor, input: unknown, ctx: SignContex
   });
   const existing = await prisma.signerCredential.findUnique({ where: { employeeId: employee.id } });
   if (existing && !existing.revokedAt) throw new AppError("already_enrolled");
+  const priorConsents = existing
+    ? await prisma.signatureEvent.count({
+        where: { organizationId: actor.organizationId, recordType: "ESIGN_CONSENT", recordId: existing.id },
+      })
+    : 0;
+  const consentRevision = priorConsents + 1;
   const signedAt = new Date();
   const event = await prisma.$transaction(async (tx) => {
     const credential = existing
@@ -443,7 +472,7 @@ export async function enrollSigner(actor: Actor, input: unknown, ctx: SignContex
       organizationId: actor.organizationId,
       recordType: "ESIGN_CONSENT",
       recordId: credential.id,
-      recordRevision: 1,
+      recordRevision: consentRevision,
       employeeId: employee.id,
       userId: null,
       signerName: legal,
@@ -475,7 +504,7 @@ export async function enrollSigner(actor: Actor, input: unknown, ctx: SignContex
     projectCode: null,
     recordType: "ESIGN_CONSENT",
     recordId: event.recordId,
-    revision: 1,
+    revision: consentRevision,
     recordDate: signedAt,
     formCode: FORM_CODE.ESIGN_CONSENT,
     recordHash,
@@ -582,36 +611,44 @@ export async function kioskStartTailgate(token: string, input: unknown, ctx: Sig
   const opened = await openKiosk(token, ctx.ip);
   const employee = await crewEmployee(opened.link.organizationId, opened.link.projectId, data.employeeId);
   await verifyPin(employee.id, data.pin, opened.tokenHash, opened.ip);
-  const existing = await prisma.safetyMeeting.findFirst({
-    where: { projectId: opened.link.projectId, crewSign: true, signLockedAt: null, status: { not: "ARCHIVED" } },
-  });
-  if (existing) throw new AppError("tailgate_open");
   const topic = tailgateTopic(data.topicCode);
   if (!topic) throw new AppError("invalid", "topicCode");
   const date = pacificTodayInput();
   const title = data.language === "es" ? topic.titleEs : topic.titleEn;
-  return prisma.safetyMeeting.create({
-    data: {
-      organizationId: opened.link.organizationId,
-      projectId: opened.link.projectId,
-      createdById: opened.link.createdByUserId,
-      title,
-      topic: title,
-      topicCode: topic.code,
-      language: data.language,
-      scheduledAt: pacificLocalToUtc(`${date}T07:00`),
-      leaderName: employeeName(employee),
-      conductorEmployeeId: employee.id,
-      policyBasis: "COMPANY_POLICY",
-      requirementCode: topic.citation,
-      discussionPoints: data.points,
-      hazards: data.hazards,
-      status: "SCHEDULED",
-      meetingKind: "TAILGATE",
-      crewSign: true,
-      signRevision: 1,
-    },
-  });
+  try {
+    return await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${opened.link.projectId}))`;
+      const existing = await tx.safetyMeeting.findFirst({
+        where: { projectId: opened.link.projectId, crewSign: true, signLockedAt: null, status: { not: "ARCHIVED" } },
+      });
+      if (existing) throw new AppError("tailgate_open");
+      return tx.safetyMeeting.create({
+        data: {
+          organizationId: opened.link.organizationId,
+          projectId: opened.link.projectId,
+          createdById: opened.link.createdByUserId,
+          title,
+          topic: title,
+          topicCode: topic.code,
+          language: data.language,
+          scheduledAt: pacificLocalToUtc(`${date}T07:00`),
+          leaderName: employeeName(employee),
+          conductorEmployeeId: employee.id,
+          policyBasis: "COMPANY_POLICY",
+          requirementCode: topic.citation,
+          discussionPoints: data.points,
+          hazards: data.hazards,
+          status: "SCHEDULED",
+          meetingKind: "TAILGATE",
+          crewSign: true,
+          signRevision: 1,
+        },
+      });
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new AppError("tailgate_open");
+    throw error;
+  }
 }
 
 export async function kioskSign(token: string, input: unknown, ctx: SignContext = {}) {
@@ -626,43 +663,60 @@ export async function kioskSign(token: string, input: unknown, ctx: SignContext 
   await verifyPin(employee.id, data.pin, opened.tokenHash, opened.ip);
   const png = decodeSignaturePng(data.signaturePng);
   const strokes = parseStrokes(data.strokes);
-  const already = await activeEvents(opened.link.organizationId, "TAILGATE", meeting.id, meeting.signRevision);
-  if (already.some((event) => event.employeeId === employee.id)) throw new AppError("already_signed");
   const credential = await prisma.signerCredential.findUniqueOrThrow({ where: { employeeId: employee.id } });
-  const late = Boolean(meeting.signLockedAt);
   const meta = contextOf(ctx);
   const content = tailgateContent(meeting, opened.link.project);
   const recordHash = recordDigest(content);
   const date = content.date;
-  const event = await prisma.$transaction(async (tx) =>
-    appendEvent(tx, {
-      organizationId: opened.link.organizationId,
-      recordType: "TAILGATE",
-      recordId: meeting.id,
-      recordRevision: meeting.signRevision,
-      employeeId: employee.id,
-      userId: null,
-      signerName: legal,
-      roleLabel: meeting.conductorEmployeeId === employee.id ? "foreman" : "attendee",
-      companyName: employee.companyName,
-      attestationText: tailgateAttestation(meeting.language, date),
-      attestationLang: meeting.language,
-      method: "pin+drawn",
-      signatureImage: png,
-      strokes,
-      typedName: legal,
-      consentTextId: credential.consentTextId,
-      ip: meta.ip,
-      userAgent: meta.userAgent,
-      deviceId: meta.deviceId,
-      signedAt: new Date(),
-      late,
-      flagged: false,
-      recordHash,
-    }),
-  );
-  if (late) await rebuildTailgatePdf(meeting.id);
-  return event;
+  let saved: Awaited<ReturnType<typeof appendEvent>>;
+  try {
+    saved = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meeting.id}))`;
+      const fresh = await tx.safetyMeeting.findFirst({ where: { id: meeting.id, organizationId: opened.link.organizationId } });
+      if (!fresh) throw new AppError("tailgate_required");
+      const prior = await tx.signatureEvent.findFirst({
+        where: {
+          organizationId: opened.link.organizationId,
+          recordType: "TAILGATE",
+          recordId: fresh.id,
+          recordRevision: fresh.signRevision,
+          employeeId: employee.id,
+        },
+        select: { id: true },
+      });
+      if (prior) throw new AppError("already_signed");
+      return appendEvent(tx, {
+        organizationId: opened.link.organizationId,
+        recordType: "TAILGATE",
+        recordId: fresh.id,
+        recordRevision: fresh.signRevision,
+        employeeId: employee.id,
+        userId: null,
+        signerName: legal,
+        roleLabel: fresh.conductorEmployeeId === employee.id ? "foreman" : "attendee",
+        companyName: employee.companyName,
+        attestationText: tailgateAttestation(fresh.language, date),
+        attestationLang: fresh.language,
+        method: "pin+drawn",
+        signatureImage: png,
+        strokes,
+        typedName: legal,
+        consentTextId: credential.consentTextId,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        deviceId: meta.deviceId,
+        signedAt: new Date(),
+        late: Boolean(fresh.signLockedAt),
+        flagged: false,
+        recordHash,
+      });
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new AppError("already_signed");
+    throw error;
+  }
+  if (saved.late) await rebuildTailgatePdf(meeting.id);
+  return saved;
 }
 
 export async function kioskSignVisitor(token: string, input: unknown, ctx: SignContext = {}) {
@@ -673,23 +727,25 @@ export async function kioskSignVisitor(token: string, input: unknown, ctx: SignC
   if (!meeting) throw new AppError("tailgate_required");
   const png = decodeSignaturePng(data.signaturePng);
   const strokes = parseStrokes(data.strokes);
-  const meta = contextOf(ctx);
   const content = tailgateContent(meeting, opened.link.project);
   const recordHash = recordDigest(content);
-  const late = Boolean(meeting.signLockedAt);
-  const event = await prisma.$transaction(async (tx) =>
-    appendEvent(tx, {
+  const meta = contextOf(ctx);
+  const saved = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meeting.id}))`;
+    const fresh = await tx.safetyMeeting.findFirst({ where: { id: meeting.id, organizationId: opened.link.organizationId } });
+    if (!fresh) throw new AppError("tailgate_required");
+    return appendEvent(tx, {
       organizationId: opened.link.organizationId,
       recordType: "TAILGATE",
-      recordId: meeting.id,
-      recordRevision: meeting.signRevision,
+      recordId: fresh.id,
+      recordRevision: fresh.signRevision,
       employeeId: null,
       userId: null,
       signerName: data.visitorName.trim(),
       roleLabel: "visitor",
       companyName: data.companyName.trim(),
-      attestationText: tailgateAttestation(meeting.language, content.date),
-      attestationLang: meeting.language,
+      attestationText: tailgateAttestation(fresh.language, meetingDate(fresh.scheduledAt)),
+      attestationLang: fresh.language,
       method: "drawn_unenrolled",
       signatureImage: png,
       strokes,
@@ -699,13 +755,13 @@ export async function kioskSignVisitor(token: string, input: unknown, ctx: SignC
       userAgent: meta.userAgent,
       deviceId: meta.deviceId,
       signedAt: new Date(),
-      late,
+      late: Boolean(fresh.signLockedAt),
       flagged: true,
       recordHash,
-    }),
-  );
-  if (late) await rebuildTailgatePdf(meeting.id);
-  return event;
+    });
+  });
+  if (saved.late) await rebuildTailgatePdf(meeting.id);
+  return saved;
 }
 
 export async function kioskFinish(token: string, input: unknown, ctx: SignContext = {}) {
@@ -718,13 +774,28 @@ export async function kioskFinish(token: string, input: unknown, ctx: SignContex
   if (!meeting || !meeting.conductorEmployeeId) throw new AppError("tailgate_required");
   if (data.employeeId !== meeting.conductorEmployeeId) throw new AppError("foreman_required");
   await verifyPin(meeting.conductorEmployeeId, data.pin, opened.tokenHash, opened.ip);
-  const signatures = await activeEvents(opened.link.organizationId, "TAILGATE", meeting.id, meeting.signRevision);
-  if (!signatures.some((event) => event.employeeId === meeting.conductorEmployeeId && event.roleLabel === "foreman")) {
-    throw new AppError("foreman_required");
-  }
-  const locked = await prisma.safetyMeeting.update({
-    where: { id: meeting.id },
-    data: { signLockedAt: new Date(), status: "COMPLETE" },
+  const locked = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meeting.id}))`;
+    const fresh = await tx.safetyMeeting.findFirst({
+      where: { id: meeting.id, organizationId: opened.link.organizationId, signLockedAt: null, status: { not: "ARCHIVED" } },
+    });
+    if (!fresh?.conductorEmployeeId) throw new AppError("tailgate_required");
+    const foremanEvent = await tx.signatureEvent.findFirst({
+      where: {
+        organizationId: opened.link.organizationId,
+        recordType: "TAILGATE",
+        recordId: fresh.id,
+        recordRevision: fresh.signRevision,
+        employeeId: fresh.conductorEmployeeId,
+        roleLabel: "foreman",
+      },
+      select: { id: true },
+    });
+    if (!foremanEvent) throw new AppError("foreman_required");
+    return tx.safetyMeeting.update({
+      where: { id: fresh.id },
+      data: { signLockedAt: new Date(), status: "COMPLETE" },
+    });
   });
   const pdf = await rebuildTailgatePdf(locked.id);
   return { meeting: locked, pdfId: pdf?.id ?? null };
