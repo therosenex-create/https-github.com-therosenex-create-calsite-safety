@@ -246,6 +246,38 @@ describe("crew sign", () => {
     expect(events.every((event) => event.signerName === "Ada Admin")).toBe(true);
   });
 
+  it("will not reopen a finished tailgate while another one is open", async () => {
+    const admin = await createCompany();
+    const project = await createProject(admin, projectInput({ code: "REV" }));
+    const foreman = await person(admin, "Nia", "Foreman");
+    await assignCrew(admin, project.id, foreman.id);
+    await enrollSigner(admin, enrollInput(foreman.id, "Nia Foreman", "3333"), ctx);
+    const { token } = await rotateKiosk(admin, project.id);
+    const start = {
+      employeeId: foreman.id,
+      pin: "3333",
+      topicCode: "1509",
+      points: "Gloves and eye protection.",
+      hazards: "Dust",
+      language: "en",
+    };
+    const first = await kioskStartTailgate(token, start, ctx);
+    await kioskSign(token, { employeeId: foreman.id, pin: "3333", attestation: "yes", signaturePng: PNG, strokes: STROKES }, ctx);
+    await kioskFinish(token, { employeeId: foreman.id, pin: "3333" }, ctx);
+    await kioskStartTailgate(token, { ...start, points: "A second tailgate is in progress." }, ctx);
+    await expect(
+      reviseLockedTailgate(admin, first.id, {
+        topicCode: "1541",
+        points: "Correct the first tailgate.",
+        hazards: "Soil",
+        language: "en",
+      }),
+    ).rejects.toMatchObject({ code: "tailgate_open" });
+    const unchanged = await prisma.safetyMeeting.findUniqueOrThrow({ where: { id: first.id } });
+    expect(unchanged.signRevision).toBe(1);
+    expect(unchanged.signLockedAt).toBeTruthy();
+  });
+
   it("has English and Spanish copy for every kiosk screen", async () => {
     for (const key of KIOSK_SCREEN_KEYS) {
       const english = t("en", key);

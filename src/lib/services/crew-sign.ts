@@ -389,6 +389,19 @@ function tailgateContent(meeting: {
   };
 }
 
+async function lockedTailgateContent(tx: Tx, meetingId: string, organizationId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meetingId}))`;
+  const fresh = await tx.safetyMeeting.findFirst({ where: { id: meetingId, organizationId } });
+  if (!fresh?.projectId) throw new AppError("tailgate_required");
+  const project = await tx.project.findFirst({
+    where: { id: fresh.projectId, organizationId },
+    select: { id: true, name: true, code: true },
+  });
+  if (!project) throw new AppError("not_found");
+  const content = tailgateContent(fresh, project);
+  return { fresh, recordHash: recordDigest(content), date: content.date };
+}
+
 async function currentTailgate(projectId: string) {
   const open = await prisma.safetyMeeting.findFirst({
     where: { projectId, crewSign: true, signLockedAt: null, status: { not: "ARCHIVED" } },
@@ -667,13 +680,12 @@ export async function kioskSign(token: string, input: unknown, ctx: SignContext 
   const meta = contextOf(ctx);
   const content = tailgateContent(meeting, opened.link.project);
   const recordHash = recordDigest(content);
-  const date = content.date;
   let saved: Awaited<ReturnType<typeof appendEvent>>;
   try {
     saved = await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meeting.id}))`;
-      const fresh = await tx.safetyMeeting.findFirst({ where: { id: meeting.id, organizationId: opened.link.organizationId } });
-      if (!fresh) throw new AppError("tailgate_required");
+      const current = await lockedTailgateContent(tx, meeting.id, opened.link.organizationId);
+      if (current.recordHash !== recordHash) throw new AppError("content_changed");
+      const fresh = current.fresh;
       const prior = await tx.signatureEvent.findFirst({
         where: {
           organizationId: opened.link.organizationId,
@@ -695,7 +707,7 @@ export async function kioskSign(token: string, input: unknown, ctx: SignContext 
         signerName: legal,
         roleLabel: fresh.conductorEmployeeId === employee.id ? "foreman" : "attendee",
         companyName: employee.companyName,
-        attestationText: tailgateAttestation(fresh.language, date),
+        attestationText: tailgateAttestation(fresh.language, current.date),
         attestationLang: fresh.language,
         method: "pin+drawn",
         signatureImage: png,
@@ -708,7 +720,7 @@ export async function kioskSign(token: string, input: unknown, ctx: SignContext 
         signedAt: new Date(),
         late: Boolean(fresh.signLockedAt),
         flagged: false,
-        recordHash,
+        recordHash: current.recordHash,
       });
     });
   } catch (error) {
@@ -731,9 +743,9 @@ export async function kioskSignVisitor(token: string, input: unknown, ctx: SignC
   const recordHash = recordDigest(content);
   const meta = contextOf(ctx);
   const saved = await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meeting.id}))`;
-    const fresh = await tx.safetyMeeting.findFirst({ where: { id: meeting.id, organizationId: opened.link.organizationId } });
-    if (!fresh) throw new AppError("tailgate_required");
+    const current = await lockedTailgateContent(tx, meeting.id, opened.link.organizationId);
+    if (current.recordHash !== recordHash) throw new AppError("content_changed");
+    const fresh = current.fresh;
     return appendEvent(tx, {
       organizationId: opened.link.organizationId,
       recordType: "TAILGATE",
@@ -744,7 +756,7 @@ export async function kioskSignVisitor(token: string, input: unknown, ctx: SignC
       signerName: data.visitorName.trim(),
       roleLabel: "visitor",
       companyName: data.companyName.trim(),
-      attestationText: tailgateAttestation(fresh.language, meetingDate(fresh.scheduledAt)),
+      attestationText: tailgateAttestation(fresh.language, current.date),
       attestationLang: fresh.language,
       method: "drawn_unenrolled",
       signatureImage: png,
@@ -757,7 +769,7 @@ export async function kioskSignVisitor(token: string, input: unknown, ctx: SignC
       signedAt: new Date(),
       late: Boolean(fresh.signLockedAt),
       flagged: true,
-      recordHash,
+      recordHash: current.recordHash,
     });
   });
   if (saved.late) await rebuildTailgatePdf(meeting.id);
@@ -905,8 +917,24 @@ export async function reviseLockedTailgate(actor: Actor, meetingId: string, inpu
   if (!topic) throw new AppError("invalid", "topicCode");
   const title = data.language === "es" ? topic.titleEs : topic.titleEn;
   const previous = meeting.signRevision;
-  await prisma.$transaction(async (tx) => {
-    const events = await tx.signatureEvent.findMany({
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (meeting.projectId) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meeting.projectId}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${meetingId}))`;
+      const fresh = await tx.safetyMeeting.findFirst({ where: { id: meetingId, organizationId: actor.organizationId } });
+      if (!fresh?.crewSign || !fresh.signLockedAt) throw new AppError("not_locked");
+      const open = await tx.safetyMeeting.findFirst({
+        where: {
+          projectId: fresh.projectId,
+          crewSign: true,
+          signLockedAt: null,
+          status: { not: "ARCHIVED" },
+          NOT: { id: meetingId },
+        },
+        select: { id: true },
+      });
+      if (open) throw new AppError("tailgate_open");
+      const events = await tx.signatureEvent.findMany({
       where: {
         organizationId: actor.organizationId,
         recordType: "TAILGATE",
@@ -943,7 +971,11 @@ export async function reviseLockedTailgate(actor: Actor, meetingId: string, inpu
         hazards: data.hazards,
       },
     });
-  });
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") throw new AppError("tailgate_open");
+    throw error;
+  }
   await audit(prisma, actor, "revise_tailgate", "SafetyMeeting", meetingId, { fromRevision: previous });
   return prisma.safetyMeeting.findUniqueOrThrow({ where: { id: meetingId } });
 }
