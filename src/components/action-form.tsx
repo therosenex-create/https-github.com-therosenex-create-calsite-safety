@@ -11,6 +11,7 @@ export function ActionForm({
   multipart,
   secondary,
   variant,
+  wide,
 }: {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   submitLabel: string;
@@ -18,10 +19,11 @@ export function ActionForm({
   multipart?: boolean;
   secondary?: boolean;
   variant?: "primary" | "secondary" | "amber";
+  wide?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const tone = variant ?? (secondary ? "secondary" : "primary");
-  const buttonClass = tone === "amber" ? "btn-amber" : tone === "secondary" ? "btn-secondary" : "btn";
+  const buttonClass = `${tone === "amber" ? "btn-amber" : tone === "secondary" ? "btn-secondary" : "btn"}${wide ? " w-full min-h-14 text-base" : ""}`;
   return (
     <form action={formAction} className="space-y-4" encType={multipart ? "multipart/form-data" : undefined}>
       {children}

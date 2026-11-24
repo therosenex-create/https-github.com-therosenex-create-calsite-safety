@@ -32,7 +32,7 @@ export default async function MeetingPrint({ params }: { params: Promise<{ id: s
           <li key={row.id}>{row.employee.firstName} {row.employee.lastName} · {row.method}</li>
         ))}
         {meeting.acknowledgments.map((row) => (
-          <li key={row.id}>{row.signerName} · {t(locale, `tailgate.role.${row.roleLabel}`)} · {formatPacific(locale, row.signedAt)} · {row.method}</li>
+          <li key={row.id}>{row.signerName} · {t(locale, `tailgate.role.${row.roleLabel}`)} · {formatPacific(locale, row.signedAt)} · {row.method === "typed_name" ? t(locale, "kiosk.legacyRoster") : row.method}</li>
         ))}
       </ul>
       <PrintFooter locale={locale} demonstration={actor.isDemonstration} />

@@ -70,3 +70,40 @@ Use a company you created with sign-up, not the demonstration seed, unless you a
 - [ ] Create an evidence packet and open its print view. Confirm the footer says it is not a Cal/OSHA filing
 - [ ] Attach a contract file, type a clause quote, and accept it with a reason. Confirm a task appears and the quote stayed the sentence you typed
 - [ ] Open `GET /api/health` and confirm `ok` is true
+- [ ] Enroll one worker for Crew Sign on a phone, then revoke it if this was only a trial
+- [ ] Open a project kiosk, run one tailgate where each person signs, and download the PDF
+
+## Crew Sign
+
+### Enrollment
+
+1. Sign in as an admin. Open the worker. Choose **Enroll for Crew Sign**.
+2. Hand the phone to that worker. They read the consent, tick **I agree**, draw a signature, type their own name, and choose a 4 to 6 digit PIN. They enter the PIN twice.
+3. You stay on the page as the witness. The record stores your name and the time. The worker's PIN is hashed. The consent PDF is stored with the signature event.
+4. Tell the worker that a paper signature sheet is always available.
+5. To stop a PIN from working, an admin uses **Revoke Crew Sign** on that enrollment. Revoking does not delete the consent event.
+
+Do not enroll a real person in the demonstration company.
+
+### Kiosk link
+
+1. Open the project. Choose **Open kiosk** or **Rotate kiosk link**.
+2. Copy the URL from that screen and print the QR poster before you leave the page. The token is not stored. Only its SHA-256 is stored.
+3. Rotating or disabling the link makes the previous URL return not found.
+4. Each person on the crew taps their own name. Nobody types another person's name or PIN.
+
+### Chain verify
+
+`GET /api/sign/verify/:recordId` is available to an admin or a safety manager. It recomputes every event hash in the company and checks that the hashes form one chain. The same check is on **Verify signature chain** in the app. A changed field fails the check. The database trigger `signature_events_no_update_delete` rejects updates and deletes, so a correction is a new void row.
+
+### Signed files and export
+
+Finished records are stored in `signed_record_pdfs`. The bytes and `sha256` are written when the PDF is built. `exported_at` stays null. A filing agent is the only writer of that column. Read the list from `v_signed_export` (`id`, `project_name`, `project_code`, `record_type`, `record_date`, `file_name`, `sha256`, `completed_at`).
+
+A paper original uploaded from the kiosk is a `safety_documents` row with category `PAPER_SCAN_INBOX` and a `paper_originals` row. The project shows **Signed original on paper - scan** plus the file name when one is attached to a meeting.
+
+### Netlify site protection
+
+This site uses Netlify Team SSO on all deploys. The kiosk URL has to be reachable by a phone that is not signed into the team. Set the site protection to non-production deploys only, so production is public and preview deploys stay behind the team login. Do not change that setting from this repository. This change is made in the Netlify UI by a person who administers the site. Leave production environment variables as they are. Apply `prisma/migrations/20261124230000_crew_sign` only after the migration has been reviewed. Do not run it against production as part of opening the pull request.
+
+`SIGNING_P12_BASE64` and `SIGNING_P12_PASSWORD` are reserved for a later PAdES step. This release stores the PDF and its SHA-256 and does not sign the PDF with a certificate.

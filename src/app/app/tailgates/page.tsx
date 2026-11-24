@@ -1,14 +1,11 @@
 import Link from "next/link";
-import { ActionForm } from "@/components/action-form";
-import { PageHeader, Pager, SelectField, TextArea, TextField } from "@/components/fields";
-import { ModalForm } from "@/components/modal-form";
+import { PageHeader, Pager, SelectField } from "@/components/fields";
 import { StatusPill } from "@/components/status-pill";
 import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
 import { listProjectOptions, listTailgateCadence, listTailgates } from "@/lib/services/work";
-import { TAILGATE_TOPICS, tailgateTopicLabel } from "@/lib/tailgate-topics";
-import { formatDateOnly, pacificTodayInput } from "@/lib/time";
-import { createTailgateAction } from "@/server/actions";
+import { tailgateTopicLabel } from "@/lib/tailgate-topics";
+import { formatDateOnly } from "@/lib/time";
 
 export default async function TailgatesPage({ searchParams }: { searchParams: Promise<{ page?: string; project?: string }> }) {
   const params = await searchParams;
@@ -19,44 +16,14 @@ export default async function TailgatesPage({ searchParams }: { searchParams: Pr
     listProjectOptions(actor),
     listTailgateCadence(actor),
   ]);
-  const canWrite = actor.role !== "WORKER";
   const pageHref = (page: number) => `/app/tailgates?page=${page}${projectId ? `&project=${projectId}` : ""}`;
   return (
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <PageHeader title={t(locale, "tailgate.title")} subtitle={t(locale, "tailgate.intro")} />
-        {canWrite && projects.length > 0 ? (
-          <ModalForm id="tailgate-log" label={t(locale, "tailgate.log")} title={t(locale, "tailgate.modalTitle")} closeLabel={t(locale, "actions.close")}>
-            <ActionForm action={createTailgateAction} submitLabel={t(locale, "tailgate.log")} variant="amber">
-              <SelectField label={t(locale, "fields.project")} name="projectId" required defaultValue={projectId || projects[0]?.id}>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </SelectField>
-              <SelectField label={t(locale, "tailgate.topic")} name="topicCode" defaultValue="1541">
-                {TAILGATE_TOPICS.map((topic) => (
-                  <option key={topic.code} value={topic.code}>
-                    {locale === "es" ? topic.titleEs : topic.titleEn}
-                  </option>
-                ))}
-              </SelectField>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField label={t(locale, "fields.leaderName")} name="conductorName" required />
-                <TextField label={t(locale, "fields.conductedOn")} name="conductedOn" type="date" required defaultValue={pacificTodayInput()} />
-              </div>
-              <TextArea label={t(locale, "tailgate.roster")} name="roster" required hint={t(locale, "tailgate.rosterHint")} rows={3} />
-              <TextField label={t(locale, "tailgate.signature")} name="signatureName" required hint={t(locale, "tailgate.signatureHint")} />
-              <SelectField label={t(locale, "fields.language")} name="language" defaultValue={locale}>
-                <option value="en">English</option>
-                <option value="es">Español</option>
-              </SelectField>
-            </ActionForm>
-          </ModalForm>
-        ) : null}
       </div>
-      <p className="note mb-4">{t(locale, "tailgate.workingDays")}</p>
+      <p className="note mb-4">{t(locale, "sign.intro")}</p>
+      <p className="note mb-4">{t(locale, "kiosk.legacyRoster")}</p>
       <section className="mb-6">
         <h2 className="font-serif text-2xl text-navy">{t(locale, "tailgate.cadence")}</h2>
         {cadence.length === 0 ? <p className="mt-2 text-sm text-muted">{t(locale, "dash.tailgateEmpty")}</p> : null}

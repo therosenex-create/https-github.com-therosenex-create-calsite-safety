@@ -59,6 +59,28 @@ enum MeetingKind {
   TAILGATE
 }
 
+enum WorkerType {
+  W2
+  SUBCONTRACTOR
+  SUB_1099
+}
+
+enum SignableType {
+  TAILGATE
+  TRAINING_ACK
+  JHA_SIGNOFF
+  INSPECTION
+  CP_ACCEPTANCE
+  PROGRAM_ADOPTION
+  ESIGN_CONSENT
+}
+
+enum SignRequestStatus {
+  AWAITING
+  SIGNED
+  SUPERSEDED
+}
+
 enum PolicyBasis {
   COMPANY_POLICY
   CONTRACT_REQUIREMENT
@@ -270,6 +292,14 @@ model Organization {
   contractDocuments          ContractDocument[]
   contractDrafts             ContractDraft[]
   contractImpactReviews      ContractImpactReview[]
+  signerCredentials          SignerCredential[]
+  consentTexts               ConsentText[]
+  kioskLinks                 KioskLink[]
+  signatureEvents            SignatureEvent[]
+  signatureVoids             SignatureVoid[]
+  signedPdfs                 SignedRecordPdf[]
+  paperOriginals             PaperOriginal[]
+  signRequests               SignRequest[]
 
   @@map("organizations")
 }
@@ -287,6 +317,11 @@ model User {
   regulatoryReviews RegulatoryReview[]
   acceptedContractDrafts ContractDraft[] @relation("ContractAcceptedBy")
   contractImpactReviews ContractImpactReview[]
+  witnessedEnrollments  SignerCredential[] @relation("SignerEnrolledBy")
+  revokedSigners        SignerCredential[] @relation("SignerRevokedBy")
+  signatureEvents       SignatureEvent[]
+  signatureVoids        SignatureVoid[]
+  signRequests          SignRequest[]
 
   @@map("users")
 }
@@ -309,6 +344,7 @@ model Project {
   id                     String             @id @default(cuid())
   organizationId         String             @map("organization_id")
   name                   String
+  code                   String?
   jobsiteName            String?            @map("jobsite_name")
   streetAddress          String             @map("street_address")
   city                   String
@@ -349,6 +385,10 @@ model Project {
   contractDrafts         ContractDraft[]
   contractImpactReviews  ContractImpactReview[]
   iippSubmittals         IippSubmittal[]
+  kioskLinks             KioskLink[]
+  signedPdfs             SignedRecordPdf[]
+  paperOriginals         PaperOriginal[]
+  signRequests           SignRequest[]
 
   @@index([organizationId, status])
   @@map("projects")
@@ -366,12 +406,17 @@ model Employee {
   preferredLanguage String         @default("en") @map("preferred_language")
   hireDate          DateTime?      @map("hire_date")
   status            EmployeeStatus @default(ACTIVE)
+  workerType        WorkerType     @default(W2) @map("worker_type")
+  companyName       String?        @map("company_name")
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
   organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   assignments       ProjectAssignment[]
   attendance        MeetingAttendance[]
   trainings         TrainingRecord[]
+  signerCredential  SignerCredential?
+  conductedMeetings SafetyMeeting[] @relation("TailgateConductor")
+  signatureEvents   SignatureEvent[]
 
   @@index([organizationId, status])
   @@map("employees")
@@ -406,13 +451,20 @@ model SafetyMeeting {
   workerQuestions   String?             @map("worker_questions") @db.Text
   followUp          String?             @map("follow_up") @db.Text
   notes             String?             @db.Text
-  status            MeetingStatus       @default(SCHEDULED)
-  meetingKind       MeetingKind         @default(GENERAL) @map("meeting_kind")
-  createdById       String              @map("created_by_id")
-  createdAt         DateTime            @default(now()) @map("created_at")
-  updatedAt         DateTime            @updatedAt @map("updated_at")
-  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  project           Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  status               MeetingStatus       @default(SCHEDULED)
+  meetingKind          MeetingKind         @default(GENERAL) @map("meeting_kind")
+  crewSign             Boolean             @default(false) @map("crew_sign")
+  signRevision         Int                 @default(1) @map("sign_revision")
+  signLockedAt         DateTime?           @map("sign_locked_at")
+  hazards              String?             @db.Text
+  topicCode            String?             @map("topic_code")
+  conductorEmployeeId  String?             @map("conductor_employee_id")
+  createdById          String              @map("created_by_id")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project              Project?            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  conductorEmployee    Employee?           @relation("TailgateConductor", fields: [conductorEmployeeId], references: [id], onDelete: Restrict)
   attendance        MeetingAttendance[]
   acknowledgments   MeetingAcknowledgment[]
   evidenceLinks     ComplianceEvidenceLink[]
@@ -1260,4 +1312,193 @@ model EvidencePacketItem {
   @@unique([packetId, kind, recordId])
   @@index([organizationId])
   @@map("evidence_packet_items")
+}
+
+model ConsentText {
+  id             String             @id @default(cuid())
+  organizationId String             @map("organization_id")
+  version        String
+  language       String
+  body           String             @db.Text
+  sha256         String
+  createdAt      DateTime           @default(now()) @map("created_at")
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  credentials    SignerCredential[]
+  events         SignatureEvent[]
+
+  @@unique([organizationId, version, language])
+  @@index([organizationId])
+  @@map("consent_texts")
+}
+
+model SignerCredential {
+  id               String       @id @default(cuid())
+  organizationId   String       @map("organization_id")
+  employeeId       String       @unique @map("employee_id")
+  pinHash          String       @map("pin_hash")
+  consentTextId    String       @map("consent_text_id")
+  consentEventId   String?      @unique @map("consent_event_id")
+  enrolledByUserId String       @map("enrolled_by_user_id")
+  enrolledAt       DateTime     @default(now()) @map("enrolled_at")
+  failedAttempts   Int          @default(0) @map("failed_attempts")
+  lockedUntil      DateTime?    @map("locked_until")
+  revokedAt        DateTime?    @map("revoked_at")
+  revokedByUserId  String?      @map("revoked_by_user_id")
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  employee         Employee     @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  consentText      ConsentText  @relation(fields: [consentTextId], references: [id], onDelete: Restrict)
+  consentEvent     SignatureEvent? @relation("ConsentEvent", fields: [consentEventId], references: [id], onDelete: Restrict)
+  enrolledBy       User         @relation("SignerEnrolledBy", fields: [enrolledByUserId], references: [id], onDelete: Restrict)
+  revokedBy        User?        @relation("SignerRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@map("signer_credentials")
+}
+
+model KioskLink {
+  id              String       @id @default(cuid())
+  organizationId  String       @map("organization_id")
+  projectId       String       @map("project_id")
+  tokenHash       String       @unique @map("token_hash")
+  active          Boolean      @default(true)
+  createdByUserId String       @map("created_by_user_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  rotatedAt       DateTime?    @map("rotated_at")
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, projectId])
+  @@map("kiosk_links")
+}
+
+model SignatureEvent {
+  id               String        @id @default(cuid())
+  organizationId   String        @map("organization_id")
+  recordType       SignableType  @map("record_type")
+  recordId         String        @map("record_id")
+  recordRevision   Int           @default(1) @map("record_revision")
+  employeeId       String?       @map("employee_id")
+  userId           String?       @map("user_id")
+  signerName       String        @map("signer_name")
+  roleLabel        String        @map("role_label")
+  companyName      String?       @map("company_name")
+  attestationText  String        @map("attestation_text") @db.Text
+  attestationLang  String        @map("attestation_lang")
+  method           String
+  signatureImage   Bytes         @map("signature_image")
+  strokes          Json
+  typedName        String        @map("typed_name")
+  consentTextId    String?       @map("consent_text_id")
+  ip               String?
+  userAgent        String?       @map("user_agent")
+  deviceId         String?       @map("device_id")
+  signedAt         DateTime      @default(now()) @map("signed_at")
+  late             Boolean       @default(false)
+  flagged          Boolean       @default(false)
+  recordHash       String        @map("record_hash")
+  prevEventHash    String?       @map("prev_event_hash")
+  eventHash        String        @unique @map("event_hash")
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  employee         Employee?     @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  user             User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  consentText      ConsentText?  @relation(fields: [consentTextId], references: [id], onDelete: Restrict)
+  voidRow          SignatureVoid?
+  credentialUsing  SignerCredential? @relation("ConsentEvent")
+
+  @@index([organizationId, recordType, recordId])
+  @@map("signature_events")
+}
+
+model SignatureVoid {
+  id             String         @id @default(cuid())
+  organizationId String         @map("organization_id")
+  eventId        String         @unique @map("event_id")
+  recordType     SignableType   @map("record_type")
+  recordId       String         @map("record_id")
+  recordRevision Int            @map("record_revision")
+  reason         String
+  voidedAt       DateTime       @default(now()) @map("voided_at")
+  voidedByUserId String?        @map("voided_by_user_id")
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  event          SignatureEvent @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  voidedBy       User?          @relation(fields: [voidedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, recordType, recordId])
+  @@map("signature_voids")
+}
+
+model SignedRecordPdf {
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  projectId      String?      @map("project_id")
+  recordType     SignableType @map("record_type")
+  recordId       String       @map("record_id")
+  revision       Int
+  recordDate     DateTime     @map("record_date")
+  fileName       String       @map("file_name")
+  bytes          Bytes
+  sha256         String
+  completedAt    DateTime     @map("completed_at")
+  exportedAt     DateTime?    @map("exported_at")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@unique([recordType, recordId, revision])
+  @@index([organizationId])
+  @@map("signed_record_pdfs")
+}
+
+model PaperOriginal {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  recordType     SignableType? @map("record_type")
+  recordId       String?       @map("record_id")
+  projectId      String?       @map("project_id")
+  recordDate     DateTime      @map("record_date")
+  formCode       String        @map("form_code")
+  fileName       String        @map("file_name")
+  sha256         String
+  pages          Int
+  source         String
+  documentId     String?       @map("document_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@map("paper_originals")
+}
+
+model SignRequest {
+  id              String            @id @default(cuid())
+  organizationId  String            @map("organization_id")
+  projectId       String?           @map("project_id")
+  recordType      SignableType      @map("record_type")
+  recordId        String            @map("record_id")
+  revision        Int               @default(1)
+  title           String
+  body            String            @db.Text
+  language        String
+  formCode        String            @map("form_code")
+  status          SignRequestStatus @default(AWAITING)
+  createdByUserId String            @map("created_by_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  project         Project?          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  createdBy       User              @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status])
+  @@map("sign_requests")
+}
+
+model KioskAttempt {
+  id          String   @id @default(cuid())
+  tokenHash   String   @map("token_hash")
+  ip          String
+  success     Boolean
+  attemptedAt DateTime @default(now()) @map("attempted_at")
+
+  @@index([tokenHash, ip, attemptedAt])
+  @@map("kiosk_attempts")
 }

@@ -154,7 +154,7 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
 }
 
 const projectKeys = [
-  "name", "jobsiteName", "streetAddress", "city", "county", "state", "postalCode", "ownerType", "ownerName",
+  "name", "code", "jobsiteName", "streetAddress", "city", "county", "state", "postalCode", "ownerType", "ownerName",
   "publicWorksStatus", "publicWorksRationale", "description", "scopeOfWork", "status", "startDate", "endDate", "jurisdictionConfirmed",
 ];
 
@@ -201,7 +201,7 @@ export async function removeCrewAction(projectId: string, employeeId: string) {
   revalidatePath(`/app/projects/${projectId}`);
 }
 
-const employeeKeys = ["firstName", "lastName", "email", "phone", "jobTitle", "trade", "preferredLanguage", "hireDate", "status"];
+const employeeKeys = ["firstName", "lastName", "email", "phone", "jobTitle", "trade", "preferredLanguage", "hireDate", "status", "workerType", "companyName"];
 
 export async function createEmployeeAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   let id = "";
@@ -239,18 +239,12 @@ const meetingKeys = [
 const tailgateKeys = ["projectId", "topicCode", "conductedOn", "conductorName", "signatureName", "roster", "language"];
 
 export async function createTailgateAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  let projectId = "";
   try {
-    const meeting = await createTailgate(await getActor(), values(formData, tailgateKeys));
-    projectId = meeting.projectId ?? "";
+    await createTailgate(await getActor(), values(formData, tailgateKeys));
   } catch (error) {
     return fail(error);
   }
-  revalidatePath("/app/tailgates");
-  revalidatePath("/app/meetings");
-  revalidatePath("/app/projects");
-  revalidatePath("/app");
-  redirect(projectId ? `/app/tailgates?project=${projectId}` : "/app/tailgates");
+  redirect("/app/tailgates");
 }
 
 export async function createMeetingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

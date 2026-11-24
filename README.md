@@ -48,6 +48,22 @@ Auth.js is self-hosted. There is no Clerk account and no OAuth provider in this 
 - Playwright in CI. Critical paths are covered in Vitest against Postgres
 - Wage rates, certified-payroll submission, and apprentice ratios. The public-works screen stores pointers and drafts only
 
+## Crew Sign
+
+Crew Sign is the per-worker signature flow for a tailgate and for owner adoption of a written program.
+
+- An admin opens a worker's page, chooses **Enroll for Crew Sign**, and hands the phone to that worker. The worker reads the versioned consent in English or Spanish, ticks **I agree**, draws a signature, types their own printed name, and sets a 4 to 6 digit PIN. The PIN is stored as a bcrypt hash. The enrollment records a signature event and a consent PDF. A paper sheet is always offered. An admin can revoke enrollment.
+- Each project can have one active kiosk link. The link is a 32-byte random token. The database stores only the SHA-256 of the token. Rotating or disabling the link makes the old URL stop working. The QR poster is generated when you still have the token. It is not saved.
+- On the kiosk, each person taps their own name, reads the tailgate, ticks the attestation, draws a signature, and enters their own PIN. The meeting date is the server's Pacific date and cannot be edited. Five wrong PINs lock that person for 15 minutes. A visitor or subcontractor can sign with a drawn signature and a typed name. That signature is marked `drawn_unenrolled` and flagged. The foreman signs and then finishes the tailgate, which locks it and stores a PDF.
+- Someone who was absent can sign later, only as themselves. The stored time is the time they sign, and the PDF says they signed late.
+- Editing a finished tailgate opens revision 2 and writes a void row for each prior signature. The old events stay in the table. Postgres rejects `UPDATE` and `DELETE` on `signature_events`.
+- An admin can sign a training acknowledgment, JHA, inspection, code-of-safe-practices acceptance, or program adoption from **Awaiting your signature**. Each signature is its own event. The admin uses the account password plus a drawn signature.
+- The signed PDF includes the roster images and an audit certificate for each event: signer, role, method, Pacific time, UTC, IP, a short user-agent, the device cookie, consent version, and the record and event hashes. The footer carries the record id, revision, and content SHA-256. `signed_record_pdfs.exported_at` is left null for a filing agent to set. The view `v_signed_export` lists the file name, project, date, and hash.
+- File names look like `ELM_TG_TAILGATE_2026-11-24_ESIGNED_r1.pdf`.
+- No email or SMS is sent.
+
+The demonstration seed adds a project code and three demo workers. It does not enroll them and it does not store signatures.
+
 ## Phase 3 additions
 
 - Public-works records with a dated registration note, an optional company file, a determination id, and an apprenticeship note. Certified payroll rows are drafts with `submittedToAgency` forced false. No dollar rates.
@@ -197,7 +213,8 @@ Qualified safety, legal, labor, or engineering review is still required before a
 - Every tenant query filters on `organizationId`. A missing row and another company's row both return not found.
 - Workers cannot create projects, inspections, or roster attendance. They can report an incident and acknowledge their own meeting when their employee email matches.
 - Closing a corrective action or an incident requires an evidence or investigation note.
-- Audit events are append-only in the application. There is no edit API. The database owner can still change rows, so this is not a tamper-proof ledger.
+- Audit events are append-only in the application. There is no edit API. The database owner can still change those rows, so this is not a tamper-proof ledger.
+- Signature events are append-only in Postgres. The trigger `signature_events_no_update_delete` rejects updates and deletes. A correction is a new void row. Verify recomputes the hash chain.
 - `npm audit` on this lockfile reports no critical findings and five high findings: Prisma through `deepmerge-ts`, PostCSS, and Zod. The published fixes that move Prisma to 7 or Zod to 4 are not applied. PostCSS is a build dependency and was left on the version this app already builds with. Next.js stays on 15.5.28.
 - Page CSP is set in middleware with a per-request script nonce and `strict-dynamic`. That script policy does not include `'unsafe-inline'`. Styles still allow inline CSS.
 - Accessibility checked here: skip link, header, navigation, main, labels on sign-in and sign-up, and a visible focus outline. This is not a WCAG certification.

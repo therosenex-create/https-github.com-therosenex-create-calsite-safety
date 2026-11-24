@@ -13,6 +13,22 @@ export default auth((request) => {
   requestHeaders.set("Content-Security-Policy", csp);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
+  const path = request.nextUrl.pathname;
+  if (path.startsWith("/k/") || path.startsWith("/api/sign/")) {
+    response.headers.set("Cache-Control", "no-store");
+  }
+  if (path.startsWith("/k/") && !request.cookies.get("calsite_device")?.value) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const id = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    response.cookies.set("calsite_device", id, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
   return response;
 });
 

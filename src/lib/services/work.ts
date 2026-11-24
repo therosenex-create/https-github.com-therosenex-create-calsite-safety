@@ -8,8 +8,7 @@ import { assertAllowedFile, safeFileName } from "../files";
 import { sha256 } from "../fingerprint";
 import { getBlobStore, readStoredBlob } from "../storage";
 import { pageArgs, type Page } from "../pagination";
-import { tailgateCompliance, tailgateTopic } from "../tailgate-topics";
-import { pacificLocalToUtc } from "../time";
+import { tailgateCompliance } from "../tailgate-topics";
 import {
   correctiveActionSchema,
   documentSchema,
@@ -20,7 +19,6 @@ import {
   meetingSchema,
   parseInput,
   projectSchema,
-  tailgateSchema,
   trainingSchema,
   type CorrectiveInput,
 } from "../validation";
@@ -58,6 +56,7 @@ export async function createProject(actor: Actor, input: unknown) {
       startDate: data.startDate,
       endDate: data.endDate,
       jurisdictionConfirmed: data.jurisdictionConfirmed,
+      code: data.code,
     },
   });
   await audit(prisma, actor, "create_project", "Project", project.id, { status: project.status });
@@ -88,6 +87,7 @@ export async function updateProject(actor: Actor, id: string, input: unknown) {
       startDate: data.startDate,
       endDate: data.endDate,
       jurisdictionConfirmed: data.jurisdictionConfirmed,
+      code: data.code,
     },
   });
   await audit(prisma, actor, "update_project", "Project", project.id, { status: project.status });
@@ -298,51 +298,8 @@ export async function createMeeting(actor: Actor, input: unknown) {
 
 export async function createTailgate(actor: Actor, input: unknown) {
   assertCan(actor, "write_operations");
-  const data = parseInput(tailgateSchema, input);
-  await requireProject(actor, data.projectId);
-  const topic = tailgateTopic(data.topicCode);
-  if (!topic) throw new AppError("invalid", "topicCode");
-  const scheduledAt = pacificLocalToUtc(`${data.conductedOn.toISOString().slice(0, 10)}T07:00`);
-  const signedAt = new Date();
-  const meeting = await prisma.safetyMeeting.create({
-    data: {
-      organizationId: actor.organizationId,
-      createdById: actor.userId,
-      projectId: data.projectId,
-      title: topic.titleEn,
-      topic: topic.titleEn,
-      language: data.language,
-      scheduledAt,
-      leaderName: data.conductorName,
-      policyBasis: "COMPANY_POLICY",
-      requirementCode: topic.citation,
-      status: "COMPLETE",
-      meetingKind: "TAILGATE",
-      acknowledgments: {
-        create: [
-          {
-            organizationId: actor.organizationId,
-            signerName: data.signatureName,
-            roleLabel: "conductor",
-            signedAt,
-            method: "typed_name",
-          },
-          ...data.roster.map((signerName) => ({
-            organizationId: actor.organizationId,
-            signerName,
-            roleLabel: "attendee",
-            signedAt,
-            method: "typed_name",
-          })),
-        ],
-      },
-    },
-  });
-  await audit(prisma, actor, "create_tailgate", "SafetyMeeting", meeting.id, {
-    citation: topic.citation,
-    attendees: data.roster.length,
-  });
-  return meeting;
+  void input;
+  throw new AppError("use_kiosk");
 }
 
 export async function listTailgates(actor: Actor, opts: { page?: string; projectId?: string } = {}) {
@@ -369,12 +326,21 @@ export async function listTailgates(actor: Actor, opts: { page?: string; project
       take: paging.take,
       include: {
         project: { select: { id: true, name: true } },
-        acknowledgments: { select: { roleLabel: true, signedAt: true } },
+        acknowledgments: { select: { roleLabel: true, signedAt: true, method: true } },
       },
     }),
     prisma.safetyMeeting.count({ where }),
   ]);
-  const items = rows.map((meeting) => ({ ...meeting, ...tailgateCompliance(meeting.acknowledgments) }));
+  const { crewSignStats } = await import("./crew-sign");
+  const stats = await crewSignStats(
+    actor.organizationId,
+    rows.filter((meeting) => meeting.crewSign),
+  );
+  const items = rows.map((meeting) => {
+    if (!meeting.crewSign) return { ...meeting, ...tailgateCompliance(meeting.acknowledgments) };
+    const count = stats.get(meeting.id) ?? { signedCount: 0, attendeeCount: 0, conductorSigned: false, compliant: false };
+    return { ...meeting, ...count };
+  });
   return { items, total, page: paging.page, pageSize: paging.pageSize };
 }
 
@@ -421,22 +387,30 @@ export async function updateMeeting(actor: Actor, id: string, input: unknown) {
   const existing = await requireMeeting(actor, id);
   const data = parseInput(meetingSchema, input);
   if (data.projectId) await requireProject(actor, data.projectId);
+  if (existing.crewSign) {
+    const contentChanged =
+      (data.discussionPoints ?? "") !== (existing.discussionPoints ?? "") ||
+      data.topic !== existing.topic ||
+      data.language !== existing.language ||
+      data.title !== existing.title;
+    if (contentChanged) throw new AppError("use_revision");
+  }
   const meeting = await prisma.safetyMeeting.update({
     where: { id },
     data: {
       projectId: data.projectId,
-      title: data.title,
-      topic: data.topic,
-      language: data.language,
-      scheduledAt: data.scheduledAt,
+      title: existing.crewSign ? existing.title : data.title,
+      topic: existing.crewSign ? existing.topic : data.topic,
+      language: existing.crewSign ? existing.language : data.language,
+      scheduledAt: existing.crewSign ? existing.scheduledAt : data.scheduledAt,
       leaderName: data.leaderName,
       policyBasis: data.policyBasis,
       requirementCode: data.requirementCode,
-      discussionPoints: data.discussionPoints,
+      discussionPoints: existing.crewSign ? existing.discussionPoints : data.discussionPoints,
       workerQuestions: data.workerQuestions,
       followUp: data.followUp,
       notes: data.notes,
-      status: data.status,
+      status: existing.crewSign ? existing.status : data.status,
     },
   });
   if (data.followUp && data.followUp !== existing.followUp) {

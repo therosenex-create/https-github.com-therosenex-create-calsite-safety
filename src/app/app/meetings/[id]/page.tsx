@@ -6,8 +6,12 @@ import { isAppError } from "@/lib/errors";
 import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
 import { getMeeting, listEmployeeOptions, listProjectOptions } from "@/lib/services/work";
+import { listMeetingSignatures } from "@/lib/services/crew-sign";
 import { formatPacific, utcToPacificInput } from "@/lib/time";
 import { acknowledgeAction, archiveMeetingAction, attendanceAction, updateMeetingAction } from "@/server/actions";
+import { reviseTailgateAction } from "@/server/sign-actions";
+import { TAILGATE_TOPICS } from "@/lib/tailgate-topics";
+import { pacificStamp } from "@/lib/sign/format";
 
 export default async function MeetingDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,6 +23,8 @@ export default async function MeetingDetail({ params }: { params: Promise<{ id: 
   const canWrite = actor.role !== "WORKER";
   const [people, projects] = canWrite ? await Promise.all([listEmployeeOptions(actor), listProjectOptions(actor)]) : [[], []];
   const present = new Set(meeting.attendance.filter((row) => row.present).map((row) => row.employeeId));
+  const crew = meeting.crewSign ? await listMeetingSignatures(actor, meeting.id) : null;
+  const voided = new Set(crew?.voids.map((row) => row.eventId) ?? []);
   return (
     <div className="space-y-6">
       <div>
@@ -28,17 +34,59 @@ export default async function MeetingDetail({ params }: { params: Promise<{ id: 
         <p className="text-sm text-muted">{formatPacific(locale, meeting.scheduledAt)} · {meeting.leaderName}</p>
         <p className="mt-2 text-sm">{t(locale, `enum.PolicyBasis.${meeting.policyBasis}`)}</p>
         {meeting.requirementCode ? <p className="text-sm">Code: {meeting.requirementCode}</p> : null}
-        <p className="note mt-3">{meeting.meetingKind === "TAILGATE" ? t(locale, "tailgate.signatureHint") : t(locale, "common.checkbox")}</p>
+        <p className="note mt-3">{meeting.meetingKind === "TAILGATE" && meeting.acknowledgments.some((row) => row.method === "typed_name") ? t(locale, "kiosk.legacyRoster") : meeting.meetingKind === "TAILGATE" ? t(locale, "sign.intro") : t(locale, "common.checkbox")}</p>
         {meeting.acknowledgments.length > 0 ? (
           <section className="mt-4">
             <h2 className="font-serif text-2xl text-navy">{t(locale, "tailgate.acknowledgments")}</h2>
             <ul className="mt-2 space-y-1 text-sm">
               {meeting.acknowledgments.map((row) => (
                 <li key={row.id}>
-                  {row.signerName} · {t(locale, `tailgate.role.${row.roleLabel}`)} · {formatPacific(locale, row.signedAt)} · {row.method}
+                  {row.signerName} · {t(locale, `tailgate.role.${row.roleLabel}`)} · {formatPacific(locale, row.signedAt)} · {row.method === "typed_name" ? t(locale, "kiosk.legacyRoster") : row.method}
                 </li>
               ))}
             </ul>
+          </section>
+        ) : null}
+        {crew ? (
+          <section className="mt-4">
+            <h2 className="font-serif text-2xl text-navy">{t(locale, "kiosk.sign")}</h2>
+            <ul className="mt-2 space-y-2 text-sm">
+              {crew.events.map((event) => (
+                <li key={event.id}>
+                  {event.signerName} · {event.roleLabel} · {pacificStamp(event.signedAt)}
+                  {event.late ? ` · ${t(locale, "kiosk.lateNote")}` : ""}
+                  {voided.has(event.id) ? " · void" : ""}
+                  {event.flagged ? " · flagged" : ""}
+                </li>
+              ))}
+            </ul>
+            <ul className="mt-3 space-y-1 text-sm">
+              {crew.pdfs.map((pdf) => (
+                <li key={pdf.id}><Link className="underline" href={`/api/sign/pdf/${pdf.id}`}>{pdf.fileName}</Link></li>
+              ))}
+            </ul>
+            {crew.papers.map((paper) => (
+              <p key={paper.id} className="note mt-3">Signed original on paper - scan {paper.fileName}</p>
+            ))}
+            <p className="mt-3 text-sm"><Link className="underline" href={`/app/sign/verify?record=${meeting.id}`}>{t(locale, "kiosk.verify")}</Link></p>
+          </section>
+        ) : null}
+        {canWrite && meeting.crewSign && meeting.signLockedAt ? (
+          <section className="card mt-4">
+            <h2 className="font-serif text-2xl">{t(locale, "fields.revision")}</h2>
+            <ActionForm action={reviseTailgateAction.bind(null, meeting.id)} submitLabel={t(locale, "actions.save")}>
+              <SelectField label={t(locale, "tailgate.topic")} name="topicCode" defaultValue={meeting.topicCode ?? "1509"}>
+                {TAILGATE_TOPICS.map((topic) => (
+                  <option key={topic.code} value={topic.code}>{locale === "es" ? topic.titleEs : topic.titleEn}</option>
+                ))}
+              </SelectField>
+              <TextArea label={t(locale, "kiosk.points")} name="points" required defaultValue={meeting.discussionPoints} />
+              <TextArea label={t(locale, "kiosk.hazards")} name="hazards" defaultValue={meeting.hazards} />
+              <SelectField label={t(locale, "fields.language")} name="language" defaultValue={meeting.language}>
+                <option value="en">English</option>
+                <option value="es">Español</option>
+              </SelectField>
+            </ActionForm>
           </section>
         ) : null}
         <p className="mt-3"><Link className="underline" href={`/app/meetings/${meeting.id}/print`}>{t(locale, "actions.print")}</Link></p>

@@ -21,6 +21,7 @@ export default async function EmployeeDetail({ params }: { params: Promise<{ id:
     <div>
       <p className="text-sm"><Link href="/app/employees">{t(locale, "nav.people")}</Link></p>
       <h1 className="font-serif text-3xl text-navy">{person.firstName} {person.lastName}</h1>
+      {canWrite ? <p className="mt-3"><Link className="btn" href={`/app/employees/${person.id}/enroll`}>{t(locale, "kiosk.enrollTitle")}</Link></p> : null}
       {!canWrite ? <p className="mt-2 text-sm text-muted">{t(locale, "common.workerLimit")}</p> : null}
       {canWrite ? (
         <div className="card mt-4">
@@ -37,6 +38,12 @@ export default async function EmployeeDetail({ params }: { params: Promise<{ id:
               <option value="en">English</option>
               <option value="es">Español</option>
             </SelectField>
+            <SelectField label={t(locale, "fields.workerType")} name="workerType" defaultValue={person.workerType}>
+              <option value="W2">W-2</option>
+              <option value="SUBCONTRACTOR">Subcontractor</option>
+              <option value="SUB_1099">1099</option>
+            </SelectField>
+            <TextField label={t(locale, "fields.companyName")} name="companyName" defaultValue={person.companyName} />
             <TextField label={t(locale, "fields.hireDate")} name="hireDate" type="date" defaultValue={toDateInput(person.hireDate)} />
             <SelectField label={t(locale, "fields.status")} name="status" defaultValue={person.status === "ARCHIVED" ? "INACTIVE" : person.status}>
               <EnumOptions locale={locale} group="EmployeeStatus" values={["ACTIVE", "INACTIVE"]} />
