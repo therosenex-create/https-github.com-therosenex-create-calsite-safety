@@ -107,12 +107,12 @@ export function Shell({ actor, locale, children }: { actor: Actor; locale: Local
               </Link>
             </li>
           ))}
-          <li>
+          <li className="relative">
             <details>
               <summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-xs font-semibold text-navy">
                 {t(locale, "nav.more")}
               </summary>
-              <div className="absolute bottom-14 right-2 w-56 rounded-lg border border-line bg-white p-2 shadow-card">
+              <div className="absolute bottom-full right-2 z-40 mb-1 w-56 max-h-[70vh] overflow-y-auto rounded-lg border border-line bg-white p-2 shadow-card">
                 <NavLinks locale={locale} items={more} className="text-navy" />
               </div>
             </details>
