@@ -20,6 +20,9 @@ export default async function HomePage() {
           <Link className="btn-secondary" href="/sign-in">
             {t(locale, "nav.signIn")}
           </Link>
+          <Link className="inline-flex min-h-11 items-center text-sm font-semibold text-navy underline" href="/install">
+            {t(locale, "landing.install")}
+          </Link>
         </div>
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           <section className="card">
