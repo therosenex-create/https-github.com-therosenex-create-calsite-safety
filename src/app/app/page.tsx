@@ -20,6 +20,11 @@ export default async function DashboardPage() {
     <div>
       <h1 className="font-serif text-3xl text-navy">{t(locale, "dash.queue")}</h1>
       <p className="mt-2 max-w-3xl text-sm text-muted">{t(locale, "common.score")}</p>
+      <p className="mt-3 text-sm">
+        <Link className="font-semibold text-navy underline" href="/install">
+          {t(locale, "nav.install")}
+        </Link>
+      </p>
       {dash.imminent > 0 ? <p className="alert mt-4">{t(locale, "emergency")}</p> : null}
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map(([count, key, href]) => (

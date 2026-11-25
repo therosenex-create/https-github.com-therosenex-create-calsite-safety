@@ -30,6 +30,7 @@ const more = [
   ["/app/jurisdictions", "nav.cities"],
   ["/app/guidance", "nav.guidance"],
   ["/app/settings", "nav.settings"],
+  ["/install", "nav.install"],
 ] as const;
 
 function NavLinks({ locale, items, className }: { locale: Locale; items: readonly (readonly [string, string])[]; className: string }) {
@@ -58,7 +59,7 @@ export function Shell({ actor, locale, children }: { actor: Actor; locale: Local
   return (
     <div className="min-h-screen">
       <SkipLink locale={locale} />
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-navy text-white">
+      <header className="pwa-header sticky top-0 z-30 border-b border-white/10 bg-navy text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <div>
             <Link href="/app" className="font-serif text-xl">
@@ -93,11 +94,11 @@ export function Shell({ actor, locale, children }: { actor: Actor; locale: Local
         <nav className="no-print hidden w-52 shrink-0 p-4 md:block" aria-label="Primary">
           <NavLinks locale={locale} items={[...primary, ...more]} className="space-y-1 text-navy" />
         </nav>
-        <main id="content" className="min-w-0 flex-1 px-4 py-6 pb-28 md:pb-10">
+        <main id="content" className="min-w-0 flex-1 px-4 py-6 pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-10">
           {children}
         </main>
       </div>
-      <nav className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white md:hidden" aria-label="Mobile">
+      <nav className="pwa-tabbar no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white md:hidden" aria-label="Mobile">
         <ul className="grid grid-cols-5">
           {primary.map(([href, key]) => (
             <li key={href}>
@@ -124,7 +125,7 @@ export function Shell({ actor, locale, children }: { actor: Actor; locale: Local
 
 export function PublicHeader({ locale }: { locale: Locale }) {
   return (
-    <header className="bg-navy text-white">
+    <header className="pwa-header bg-navy text-white">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
         <Link href="/" className="font-serif text-2xl">
           {t(locale, "brand")}

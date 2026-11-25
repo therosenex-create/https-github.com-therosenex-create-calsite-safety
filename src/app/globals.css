@@ -8,8 +8,32 @@
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   background: #f3f0e8;
   color: #142033;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pwa-header {
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.pwa-tabbar {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+main#content {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+.qr-print svg {
+  width: 220px;
+  height: 220px;
 }
 
 :focus-visible {
@@ -56,6 +80,10 @@ body {
 @media print {
   header, nav, .no-print {
     display: none !important;
+  }
+  .qr-print svg {
+    width: 2.4in;
+    height: 2.4in;
   }
   body {
     background: white;

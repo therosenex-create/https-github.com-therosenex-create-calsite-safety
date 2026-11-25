@@ -203,3 +203,9 @@ Qualified safety, legal, labor, or engineering review is still required before a
 - Accessibility checked here: skip link, header, navigation, main, labels on sign-in and sign-up, and a visible focus outline. This is not a WCAG certification.
 
 Details and the pilot checklist are in [docs/OPERATIONS.md](docs/OPERATIONS.md).
+
+## Install on a phone
+
+Open `/install` in Safari on iPhone or Chrome on Android. That page has the home-screen steps, an Android install button, and a printable address with a QR code. The service worker caches static files and an offline notice only. It does not cache sign-in, `/api`, or safety records.
+
+The January store plan is [docs/STORE-PUBLISHING.md](docs/STORE-PUBLISHING.md). Capacitor is not in this repo yet.

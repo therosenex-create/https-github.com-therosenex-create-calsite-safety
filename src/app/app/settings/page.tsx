@@ -19,6 +19,8 @@ export default async function SettingsPage() {
         <Link className="underline" href="/app/audit">{t(locale, "nav.audit")}</Link>
         {" · "}
         <Link className="underline" href="/app/licensing">{t(locale, "nav.licensing")}</Link>
+        {" · "}
+        <Link className="underline" href="/install">{t(locale, "nav.install")}</Link>
       </p>
       <section className="card">
         <h2 className="font-serif text-2xl">{t(locale, "section.account")}</h2>
