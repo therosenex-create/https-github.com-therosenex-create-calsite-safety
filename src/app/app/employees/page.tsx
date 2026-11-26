@@ -45,6 +45,12 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Pr
                 <option value="en">English</option>
                 <option value="es">Español</option>
               </SelectField>
+              <SelectField label={t(locale, "fields.workerType")} name="workerType" defaultValue="W2">
+                <option value="W2">W-2</option>
+                <option value="SUBCONTRACTOR">Subcontractor</option>
+                <option value="SUB_1099">1099</option>
+              </SelectField>
+              <TextField label={t(locale, "fields.companyName")} name="companyName" />
               <TextField label={t(locale, "fields.hireDate")} name="hireDate" type="date" />
               <SelectField label={t(locale, "fields.status")} name="status" defaultValue="ACTIVE">
                 <EnumOptions locale={locale} group="EmployeeStatus" values={["ACTIVE", "INACTIVE"]} />

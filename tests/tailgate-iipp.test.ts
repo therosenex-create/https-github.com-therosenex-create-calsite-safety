@@ -49,32 +49,43 @@ describe("working-day tailgate cadence", () => {
 });
 
 describe("tailgate log", () => {
-  it("stores a completed tailgate with typed acknowledgments and an on-time cadence", async () => {
+  it("refuses a typed roster and keeps cadence on a completed meeting", async () => {
     const admin = await createCompany();
     const other = await createCompany("Other Builders");
     const worker = await addWorker(admin);
     const project = await createProject(admin, projectInput());
     await expect(createTailgate(worker, {})).rejects.toMatchObject({ code: "forbidden" });
-    const meeting = await createTailgate(admin, {
-      projectId: project.id,
-      topicCode: "3395",
-      conductedOn: pacificToday(),
-      conductorName: "Marcus Vance",
-      signatureName: "Marcus Vance",
-      roster: "J. Rosen, M. Vance, R. Diaz",
-      language: "en",
+    await expect(
+      createTailgate(admin, {
+        projectId: project.id,
+        topicCode: "3395",
+        conductedOn: pacificToday(),
+        conductorName: "Marcus Vance",
+        signatureName: "Marcus Vance",
+        roster: "J. Rosen, M. Vance, R. Diaz",
+        language: "en",
+      }),
+    ).rejects.toMatchObject({ code: "use_kiosk" });
+    expect(await prisma.meetingAcknowledgment.count({ where: { organizationId: admin.organizationId } })).toBe(0);
+    const meeting = await prisma.safetyMeeting.create({
+      data: {
+        organizationId: admin.organizationId,
+        projectId: project.id,
+        createdById: admin.userId,
+        title: "Heat illness",
+        topic: "Heat illness",
+        language: "en",
+        scheduledAt: new Date(),
+        leaderName: "Ada Admin",
+        status: "COMPLETE",
+        meetingKind: "TAILGATE",
+        requirementCode: "8 CCR §3395",
+      },
     });
-    expect(meeting.meetingKind).toBe("TAILGATE");
-    expect(meeting.status).toBe("COMPLETE");
-    expect(meeting.requirementCode).toBe("8 CCR §3395");
-    const acknowledgments = await prisma.meetingAcknowledgment.findMany({ where: { meetingId: meeting.id }, orderBy: { roleLabel: "asc" } });
-    expect(acknowledgments.map((row) => row.roleLabel).sort()).toEqual(["attendee", "attendee", "attendee", "conductor"]);
-    expect(acknowledgments.every((row) => row.method === "typed_name" && row.signedAt)).toBe(true);
     const status = await projectTailgateStatus(admin, project.id);
     expect(status.cadence).toBe("ON_TIME");
     const listed = await listTailgates(admin, { projectId: project.id });
-    expect(listed.items[0]?.compliant).toBe(true);
-    expect(listed.items[0]?.signedCount).toBe(3);
+    expect(listed.items[0]?.id).toBe(meeting.id);
     const hidden = await listTailgates(other, {});
     expect(hidden.items.find((row) => row.id === meeting.id)).toBeUndefined();
     await expect(projectTailgateStatus(other, project.id)).rejects.toBeInstanceOf(AppError);
@@ -83,14 +94,20 @@ describe("tailgate log", () => {
   it("marks review due when the last completed tailgate is older than 10 working days", async () => {
     const admin = await createCompany();
     const project = await createProject(admin, projectInput());
-    await createTailgate(admin, {
-      projectId: project.id,
-      topicCode: "1541",
-      conductedOn: "2025-06-02",
-      conductorName: "Elena Rostova",
-      signatureName: "Elena Rostova",
-      roster: "A. Crew",
-      language: "es",
+    await prisma.safetyMeeting.create({
+      data: {
+        organizationId: admin.organizationId,
+        projectId: project.id,
+        createdById: admin.userId,
+        title: "Trenching",
+        topic: "Trenching",
+        language: "es",
+        scheduledAt: new Date("2025-06-02T15:00:00.000Z"),
+        leaderName: "Elena Rostova",
+        status: "COMPLETE",
+        meetingKind: "TAILGATE",
+        requirementCode: "8 CCR §1541",
+      },
     });
     const status = await projectTailgateStatus(admin, project.id);
     expect(status.cadence).toBe("REVIEW_DUE");

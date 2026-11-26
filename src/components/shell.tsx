@@ -29,6 +29,7 @@ const more = [
   ["/app/smoke", "nav.smoke"],
   ["/app/jurisdictions", "nav.cities"],
   ["/app/guidance", "nav.guidance"],
+  ["/app/sign", "nav.sign"],
   ["/app/settings", "nav.settings"],
   ["/install", "nav.install"],
 ] as const;

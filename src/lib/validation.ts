@@ -71,6 +71,16 @@ export const registerSchema = z.object({
 export const projectSchema = z
   .object({
     name: text(2, 160),
+    code: z
+      .string()
+      .trim()
+      .max(12, "too_big")
+      .optional()
+      .or(z.literal(""))
+      .transform((value) => {
+        const cleaned = (value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+        return cleaned || null;
+      }),
     jobsiteName: optionalText(160),
     streetAddress: text(3, 200),
     city: text(2, 80),
@@ -117,6 +127,8 @@ export const employeeSchema = z.object({
   preferredLanguage: z.enum(["en", "es"]),
   hireDate: dateOnly,
   status: z.enum(["ACTIVE", "INACTIVE"]),
+  workerType: z.enum(["W2", "SUBCONTRACTOR", "SUB_1099"]).optional().default("W2"),
+  companyName: optionalText(160),
 });
 
 export const meetingSchema = z.object({

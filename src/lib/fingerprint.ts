@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 
-export function sha256(text: string | Buffer): string {
+export function sha256(text: string | Uint8Array): string {
   const digest = createHash("sha256");
   if (typeof text === "string") digest.update(text, "utf8");
   else digest.update(text);

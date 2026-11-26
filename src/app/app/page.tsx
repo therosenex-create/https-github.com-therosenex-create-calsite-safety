@@ -4,10 +4,11 @@ import { t } from "@/lib/i18n";
 import { formatDateOnly, formatPacific } from "@/lib/time";
 import { getActor, getLocale } from "@/lib/session";
 import { getDashboard, listOpenTasks } from "@/lib/services/work";
+import { listAwaitingSignatures } from "@/lib/services/crew-sign";
 
 export default async function DashboardPage() {
   const [actor, locale] = await Promise.all([getActor(), getLocale()]);
-  const [dash, tasks] = await Promise.all([getDashboard(actor), listOpenTasks(actor)]);
+  const [dash, tasks, awaiting] = await Promise.all([getDashboard(actor), listOpenTasks(actor), listAwaitingSignatures(actor)]);
   const cards = [
     [dash.activeProjects, "dash.projects", "/app/projects"],
     [dash.unconfirmed, "dash.unconfirmed", "/app/projects"],
@@ -53,6 +54,20 @@ export default async function DashboardPage() {
           <p className="mt-2 text-sm text-muted">{t(locale, "tailgate.workingDays")}</p>
         </Link>
       </div>
+      {actor.role === "ADMIN" ? (
+        <section className="mt-8">
+          <h2 className="font-serif text-2xl text-navy">{t(locale, "kiosk.queue")}</h2>
+          <ul className="mt-3 space-y-2">
+            {awaiting.length === 0 ? <li className="text-sm text-muted">{t(locale, "common.none")}</li> : null}
+            {awaiting.map((request) => (
+              <li key={request.id}>
+                <Link className="font-semibold text-navy underline" href="/app/sign">{request.title}</Link>
+                <p className="text-sm text-muted">{request.recordType}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <section className="mt-8">
         <h2 className="font-serif text-2xl text-navy">{t(locale, "dash.tasks")}</h2>
         <ul className="mt-3 space-y-2">

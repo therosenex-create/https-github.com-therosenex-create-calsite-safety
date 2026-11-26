@@ -8,24 +8,35 @@ import { t } from "@/lib/i18n";
 import { getActor, getLocale } from "@/lib/session";
 import { getProjectDashboard } from "@/lib/services/reporting";
 import { getProject, listEmployeeOptions, projectTailgateStatus } from "@/lib/services/work";
+import { issuedKioskMatches, kioskStatus } from "@/lib/services/crew-sign";
 import { archiveProjectAction, assignCrewAction, removeCrewAction, updateProjectAction } from "@/server/actions";
+import { disableKioskAction, rotateKioskAction } from "@/server/sign-actions";
 import { formatDateOnly, toDateInput } from "@/lib/time";
 
 const owners = ["PRIVATE", "PUBLIC_AGENCY", "SCHOOL_OR_COLLEGE", "SPECIAL_DISTRICT", "HOMEOWNER", "UNKNOWN"] as const;
 const works = ["UNKNOWN", "POTENTIALLY_APPLICABLE", "NOT_APPLICABLE", "APPLICABLE", "PENDING_QUALIFIED_REVIEW"] as const;
 const statuses = ["PLANNED", "ACTIVE", "ON_HOLD", "COMPLETE"] as const;
 
-export default async function ProjectDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ kiosk?: string }>;
+}) {
   const { id } = await params;
+  const query = await searchParams;
   const [actor, locale] = await Promise.all([getActor(), getLocale()]);
   const project = await getProject(actor, id).catch((error) => {
     if (isAppError(error) && error.code === "not_found") notFound();
     throw error;
   });
-  const [people, cadence, dashboard] = await Promise.all([
+  const [people, cadence, dashboard, activeKiosk, issued] = await Promise.all([
     actor.role === "WORKER" ? Promise.resolve([]) : listEmployeeOptions(actor),
     projectTailgateStatus(actor, project.id),
     getProjectDashboard(actor, project.id),
+    actor.role === "WORKER" ? Promise.resolve(null) : kioskStatus(actor, project.id),
+    actor.role === "WORKER" ? Promise.resolve(false) : issuedKioskMatches(actor, project.id, query.kiosk ?? ""),
   ]);
   const canWrite = actor.role !== "WORKER";
   return (
@@ -40,6 +51,7 @@ export default async function ProjectDetail({ params }: { params: Promise<{ id: 
           <StatusPill tone={cadence.cadence === "ON_TIME" ? "ok" : "due"}>{t(locale, `enum.TailgateCadence.${cadence.cadence}`)}</StatusPill>
         </p>
         <p className="mt-2 text-sm"><Link className="underline" href={`/app/contracts?project=${project.id}`}>{t(locale, "nav.contracts")}</Link></p>
+        {project.code ? <p className="mt-2 text-sm">{t(locale, "fields.projectCode")}: {project.code}</p> : null}
         {!project.jurisdictionConfirmed ? <p className="note mt-3">{t(locale, "hints.jurisdiction")}</p> : null}
         <p className="mt-3 text-sm">{t(locale, `enum.PublicWorksStatus.${project.publicWorksStatus}`)}</p>
         {project.publicWorksRationale ? <p className="text-sm text-muted">{project.publicWorksRationale}</p> : null}
@@ -139,10 +151,38 @@ export default async function ProjectDetail({ params }: { params: Promise<{ id: 
       </section>
       {canWrite ? (
         <section className="card">
+          <h2 className="font-serif text-2xl">{t(locale, "kiosk.openLink")}</h2>
+          <p className="mt-2 text-sm">{t(locale, "sign.intro")}</p>
+          <p className="note mt-3">{t(locale, "kiosk.paperOption")}</p>
+          {issued && query.kiosk ? (
+            <div className="mt-4">
+              <p className="text-sm">{t(locale, "kiosk.tokenOnce")}</p>
+              <p className="mt-2 break-all font-mono text-sm">/k/{query.kiosk}</p>
+              <p className="mt-3 flex flex-wrap gap-3">
+                <Link className="btn" href={`/k/${query.kiosk}`}>{t(locale, "kiosk.openLink")}</Link>
+                <Link className="btn-secondary" href={`/api/sign/poster/${query.kiosk}`}>{t(locale, "kiosk.poster")}</Link>
+              </p>
+            </div>
+          ) : null}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <form action={rotateKioskAction.bind(null, project.id)}>
+              <button className="btn min-h-14" type="submit">{activeKiosk ? t(locale, "kiosk.rotate") : t(locale, "kiosk.openLink")}</button>
+            </form>
+            {activeKiosk ? (
+              <form action={disableKioskAction.bind(null, project.id)}>
+                <button className="btn-secondary min-h-14" type="submit">{t(locale, "kiosk.disable")}</button>
+              </form>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+      {canWrite ? (
+        <section className="card">
           <h2 className="font-serif text-2xl">{t(locale, "section.details")}</h2>
           <div className="mt-4">
             <ActionForm action={updateProjectAction.bind(null, project.id)} submitLabel={t(locale, "actions.save")}>
               <TextField label={t(locale, "fields.name")} name="name" required defaultValue={project.name} />
+              <TextField label={t(locale, "fields.projectCode")} name="code" defaultValue={project.code} hint={t(locale, "kiosk.projectCode")} />
               <TextField label={t(locale, "fields.jobsiteName")} name="jobsiteName" defaultValue={project.jobsiteName} />
               <TextField label={t(locale, "fields.streetAddress")} name="streetAddress" required defaultValue={project.streetAddress} />
               <div className="grid gap-4 md:grid-cols-2">

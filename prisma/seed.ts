@@ -212,11 +212,12 @@ async function main() {
 
   const remodel = await prisma.project.upsert({
     where: { id: "demo-remodel" },
-    update: {},
+    update: { code: "ELM" },
     create: {
       id: "demo-remodel",
       organizationId: organization.id,
       name: "Elm Street Kitchen Remodel",
+      code: "ELM",
       streetAddress: "418 Elm Street",
       city: "Oakland",
       county: "Alameda",
